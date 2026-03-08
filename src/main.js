@@ -3,58 +3,59 @@ import { createWorld } from "./worlds/electrostatics.js"
 
 const universe = new UniverseRenderer()
 
-/* loader now receives scene + camera */
-window.loadWorld = function(name){
-
-console.log("CLICK DETECTED:", name)
-
-/* hide menu */
-
-document.getElementById("worldHub").style.display = "none"
-
-/* stop universe animation */
-
-universe.renderer.domElement.style.display = "none"
-
-/* load electrostatics world */
-
-if(name === "electrostatics"){
-    createWorld(universe.scene, universe.camera)
-}
-
-}
 /* start background universe */
-
 universe.start()
 
-/* make function visible to HTML */
+/* WORLD LOADER */
 
 window.loadWorld = function(name){
 
 console.log("CLICK DETECTED:", name)
 
-/* hide menu */
-
+/* hide world hub */
 document.getElementById("worldHub").style.display = "none"
 
-/* stop universe animation */
-
+/* hide universe canvas */
 universe.renderer.domElement.style.display = "none"
 
+/* open electrostatics lab */
+
 if(name === "electrostatics"){
-    createWorld(universe.scene, universe.camera)
+createWorld(universe.scene, universe.camera)
 }
 
 }
+
+
+/* SIMULATION LOADER */
+
 window.openSimulation = function(file){
 
 const ui = document.getElementById("ui")
 
-ui.innerHTML = ""
+/* hide electrostatics lab */
+
+const lab = document.getElementById("labContainer")
+if(lab) lab.style.display = "none"
+
+/* wrapper */
+
+const simWrap = document.createElement("div")
+simWrap.id = "simWrap"
+
+simWrap.style.position = "absolute"
+simWrap.style.top = "80px"
+simWrap.style.left = "0"
+simWrap.style.right = "0"
+simWrap.style.bottom = "120px"
+
+ui.appendChild(simWrap)
+
+/* back button */
 
 const back = document.createElement("button")
 
-back.innerText = "← Back"
+back.innerText = "← Back to Electrostatics Lab"
 
 back.style.position = "absolute"
 back.style.top = "20px"
@@ -65,20 +66,25 @@ back.style.border = "1px solid #6ec6ff"
 back.style.color = "white"
 back.style.cursor = "pointer"
 
-back.onclick = () => location.reload()
+back.onclick = ()=>{
+
+simWrap.remove()
+
+if(lab) lab.style.display = "block"
+
+}
 
 ui.appendChild(back)
+
+/* iframe */
 
 const frame = document.createElement("iframe")
 
 frame.src = file
-frame.style.position = "absolute"
-frame.style.top = "60px"
-frame.style.left = "0"
 frame.style.width = "100%"
-frame.style.height = "calc(100% - 60px)"
+frame.style.height = "100%"
 frame.style.border = "none"
 
-ui.appendChild(frame)
+simWrap.appendChild(frame)
 
 }
