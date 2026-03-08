@@ -1,5 +1,5 @@
 import { UniverseRenderer } from "./universe/UniverseRenderer.js"
-import { WorldLoader } from "./worlds/electrostatics.js"
+import { createWorld } from "./worlds/electrostatics.js"
 
 const universe = new UniverseRenderer()
 
