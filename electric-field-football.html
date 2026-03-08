@@ -1,0 +1,2812 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║         ⚡ ELECTRIC FIELD FOOTBALL                                   ║
+  ║         Created and Conceptualized by Kajal Thapar                  ║
+  ║                                                                      ║
+  ║  Build v4 — Puzzle System + Vivid Heatmap + Full Feature Upgrade     ║
+  ║                                                                      ║
+  ║  Visualization additions:                                            ║
+  ║   • Electric Potential Heatmap  (V = kq/r, G11+)                    ║
+  ║   • Equipotential Contour Lines (marching squares, G12)              ║
+  ║   • Gauss's Law mode  Φ = Q_enc/ε₀  (draw surface, G12)             ║
+  ║   • Electric potential V readout in Live Physics panel               ║
+  ║                                                                      ║
+  ║  Resolution / scaling fixes:                                         ║
+  ║   • devicePixelRatio-aware canvas — crisp on Retina/HiDPI           ║
+  ║   • Canvas fills full container — no forced aspect ratio             ║
+  ║   • ResizeObserver on canvas container (panel collapse, orientation) ║
+  ║   • DPR change detection (browser zoom, multi-monitor)              ║
+  ║   • ctx.setTransform(DPR,…) — all drawing in logical CSS pixels      ║
+  ║   • Offscreen caches keyed to logical dimensions                     ║
+  ║   • cpos() returns logical-pixel coords — no manual DPR correction   ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>⚡ Electric Field Football — by Kajal Thapar</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#07090f;--panel:#0c1220;--p2:#111b2c;--brd:#1c2e48;
+  --acc:#00e5aa;--red:#ff4455;--blue:#4488ff;--net:#00ff80;--ball:#ff9b00;
+  --txt:#bdd3f0;--dim:#506888;
+}
+html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Rajdhani',sans-serif;overflow:hidden;user-select:none;font-size:13px;touch-action:none}
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ═══ PORTRAIT BLOCKER ═══ */
+#rotmsg{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#07090f 0%,#0c1830 100%);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;text-align:center;padding:30px;
+}
+#rotmsg .ico{font-size:68px;animation:spin 2.2s ease-in-out infinite;}
+@keyframes spin{0%,30%{transform:rotate(0deg)}55%,85%{transform:rotate(90deg)}100%{transform:rotate(0deg)}}
+#rotmsg h2{font-family:'Orbitron',monospace;font-size:20px;font-weight:900;
+  background:linear-gradient(120deg,#00e5aa,#4da6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px}
+#rotmsg p{font-family:'Rajdhani',sans-serif;font-size:15px;color:var(--dim);max-width:300px;line-height:1.75}
+#rotmsg .tip{font-family:'Orbitron',monospace;font-size:9px;color:rgba(0,229,170,.45);letter-spacing:1.5px;margin-top:6px}
+@media (orientation:portrait){#rotmsg{display:flex}#app{display:none}}
+
+/* ═══ HEADER ═══ */
+#hdr{height:46px;min-height:46px;background:linear-gradient(90deg,#08101e,#0b1626);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 10px;gap:7px;flex-shrink:0;overflow:hidden}
+.logo{font-family:'Orbitron',monospace;font-weight:900;font-size:13px;background:linear-gradient(120deg,#00e5aa,#4da6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;white-space:nowrap}
+.gtabs{display:flex;gap:2px;background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:2px;flex-shrink:0}
+.gtab{font-family:'Orbitron',monospace;font-size:7px;font-weight:700;padding:3px 6px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-radius:2px;transition:all .15s;white-space:nowrap}
+.gtab.on{background:var(--acc);color:#001a0f}
+.gtab:hover:not(.on){color:var(--acc)}
+.lvtabs{display:flex;gap:2px;flex-shrink:0}
+.lvtab{font-family:'Orbitron',monospace;font-size:8px;font-weight:700;padding:3px 8px;border:1px solid var(--brd);background:transparent;color:var(--dim);cursor:pointer;border-radius:3px;transition:all .15s;white-space:nowrap}
+.lvtab.on{border-color:var(--acc);color:var(--acc);background:rgba(0,229,170,.09)}
+.sp{flex:1;min-width:4px}
+#bdgrow{display:flex;gap:3px;flex-shrink:0}
+.bdg{width:24px;height:24px;border-radius:50%;background:var(--p2);border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;transition:all .2s;flex-shrink:0}
+.bdg.lit{border-color:var(--acc);background:rgba(0,229,170,.13);box-shadow:0 0 8px rgba(0,229,170,.4)}
+.bdg:not(.lit){opacity:.2;filter:grayscale(1)}
+#scrn{font-family:'Orbitron',monospace;font-size:12px;color:var(--acc);white-space:nowrap;flex-shrink:0}
+#sbtn{font-family:'Orbitron',monospace;font-size:9px;padding:3px 7px;border:1px solid var(--brd);background:transparent;color:var(--dim);cursor:pointer;border-radius:3px;transition:all .15s;flex-shrink:0}
+#sbtn.on{color:var(--acc);border-color:var(--acc)}
+
+/* ═══ MAIN LAYOUT ═══ */
+#main{display:flex;flex:1;overflow:hidden;min-height:0;position:relative}
+
+/* ═══ SIDE PANELS ═══ */
+#lp,#rp{
+  background:var(--panel);padding:9px 8px;
+  display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;flex-shrink:0;
+  transition:width .22s ease,min-width .22s ease,padding .22s ease;
+  position:relative;
+}
+#lp{width:240px;min-width:240px;border-right:1px solid var(--brd)}
+#rp{width:260px;min-width:260px;border-left:1px solid var(--brd)}
+#lp.collapsed{width:0!important;min-width:0!important;padding:0!important;overflow:hidden}
+#rp.collapsed{width:0!important;min-width:0!important;padding:0!important;overflow:hidden}
+
+/* Panel toggle tabs */
+.ptog{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:18px;height:52px;
+  background:var(--p2);border:1px solid var(--brd);cursor:pointer;z-index:15;
+  display:none;align-items:center;justify-content:center;
+  font-size:8px;color:var(--dim);flex-direction:column;gap:2px;
+  transition:color .15s,border-color .15s;
+}
+#lptog{right:-18px;border-left:none;border-radius:0 4px 4px 0}
+#rptog{left:-18px;border-right:none;border-radius:4px 0 0 4px}
+.ptog:hover{color:var(--acc);border-color:var(--acc)}
+.ptog span{letter-spacing:0;line-height:1;font-size:10px}
+
+/* ═══ CANVAS ═══ */
+#cw{flex:1;display:flex;align-items:stretch;justify-content:stretch;background:#050810;position:relative;overflow:hidden;min-width:0;min-height:0}
+canvas{display:block;width:100%;height:100%;touch-action:none;image-rendering:crisp-edges;image-rendering:-webkit-optimize-contrast}
+
+/* ═══ FOOTER ═══ */
+#ftr{height:48px;min-height:48px;background:linear-gradient(90deg,#08101e,#0b1626);border-top:1px solid var(--brd);display:flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;flex-wrap:nowrap;overflow:hidden}
+#credit{font-family:'Rajdhani',sans-serif;font-size:9px;color:var(--dim);white-space:nowrap;letter-spacing:.5px;flex-shrink:0;padding:0 6px;border-left:1px solid var(--brd)}
+
+/* ═══ SHARED COMPONENTS ═══ */
+.pt{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:2px;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--brd);padding-bottom:3px;margin-bottom:4px}
+.btn{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;padding:7px 11px;border:none;border-radius:3px;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
+#btnL{background:linear-gradient(135deg,#00e5aa,#00a8ff);color:#001208;font-size:10px;padding:8px 18px}
+#btnL:hover:not(:disabled){filter:brightness(1.2);transform:scale(1.04)}
+#btnL:disabled{opacity:.3;cursor:not-allowed;transform:none}
+#btnP,#btnR,#btnC,#btnJ,#btnA{background:var(--p2);border:1px solid var(--brd)}
+#btnP{color:var(--txt)}#btnR{color:#ff7060;border-color:rgba(255,100,80,.2)}
+#btnC{color:var(--dim)}#btnJ{color:var(--acc);border-color:rgba(0,229,170,.25)}
+#btnA{color:var(--dim);font-size:8px}
+.btn:hover:not(:disabled){filter:brightness(1.15)}
+
+/* Charge tool */
+.ctrow{display:flex;gap:5px}
+.chtbtn{flex:1;padding:7px 0;border:2px solid var(--brd);background:var(--p2);cursor:pointer;border-radius:4px;font-size:20px;text-align:center;transition:all .15s}
+#bPos{color:var(--red)}#bNeg{color:var(--blue)}
+#bPos.on{border-color:var(--red);background:rgba(255,68,85,.14);box-shadow:0 0 10px rgba(255,68,85,.3)}
+#bNeg.on{border-color:var(--blue);background:rgba(68,136,255,.14);box-shadow:0 0 10px rgba(68,136,255,.3)}
+.mrow{display:flex;gap:3px}
+.mbtn{flex:1;padding:4px 0;border:1px solid var(--brd);background:var(--p2);color:var(--dim);cursor:pointer;border-radius:3px;font-size:8px;font-family:'Orbitron',monospace;font-weight:700;transition:all .15s;text-align:center}
+.mbtn.on{border-color:var(--acc);color:var(--acc);background:rgba(0,229,170,.08)}
+
+/* Entity panel */
+#ep{background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:8px;display:none}
+.eptit{font-family:'Orbitron',monospace;font-size:9px;margin-bottom:6px}
+.slrow{display:flex;align-items:center;gap:4px;margin-bottom:5px}
+.slbl{font-family:'Orbitron',monospace;font-size:9px;color:var(--dim);width:14px;flex-shrink:0}
+.slrow input[type=range]{flex:1;height:3px;accent-color:var(--acc);cursor:pointer}
+.sv{font-family:'Orbitron',monospace;font-size:9px;color:var(--acc);width:28px;text-align:right;flex-shrink:0}
+.polrow{display:flex;gap:4px;margin-bottom:5px}
+.pbtn{flex:1;padding:3px;border:1px solid var(--brd);background:transparent;cursor:pointer;border-radius:3px;font-size:9px;font-family:'Orbitron',monospace;transition:all .15s;text-align:center;color:var(--dim)}
+.pbtn.ra{border-color:var(--red);color:var(--red);background:rgba(255,68,85,.12)}
+.pbtn.ba{border-color:var(--blue);color:var(--blue);background:rgba(68,136,255,.12)}
+.rmbtn{width:100%;padding:3px;border:1px solid rgba(255,80,60,.22);background:transparent;color:#ff7060;cursor:pointer;border-radius:3px;font-size:8px;font-family:'Orbitron',monospace;transition:all .15s;margin-top:3px}
+.rmbtn:hover{background:rgba(255,80,60,.1)}
+
+/* Readout */
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #0c1626}
+.rl{color:var(--dim);font-size:11px}
+.rv{font-family:'Orbitron',monospace;font-size:9px;color:var(--acc);min-width:56px;text-align:right}
+
+/* Toggles */
+.trow{display:flex;align-items:center;gap:5px;padding:2px 0}
+.trow label{cursor:pointer;font-size:11px;color:var(--txt)}
+.trow input[type=checkbox]{accent-color:var(--acc);cursor:pointer;width:13px;height:13px}
+
+/* Info box */
+.ibox{background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:6px 7px;font-size:10px;color:var(--dim);line-height:1.6}
+.ib{color:var(--acc);font-size:10px}
+.lgrow{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);padding:1px 0}
+.lgd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Overlays */
+#ovr{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:20}
+#ovm{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;padding:14px 30px;border-radius:6px;text-align:center;opacity:0;transition:opacity .3s;white-space:pre-line;letter-spacing:1px;line-height:1.5}
+#ovm.goal{background:rgba(0,229,170,.14);border:2px solid var(--acc);color:var(--acc);box-shadow:0 0 60px rgba(0,229,170,.55)}
+#ovm.miss{background:rgba(255,68,85,.14);border:2px solid var(--red);color:var(--red);box-shadow:0 0 50px rgba(255,68,85,.4)}
+#ovm.card{background:rgba(255,200,0,.12);border:2px solid #ffcc00;color:#ffcc00;box-shadow:0 0 40px rgba(255,200,0,.3)}
+#toast{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-family:'Orbitron',monospace;font-size:9px;padding:5px 12px;background:rgba(7,9,15,.95);border:1px solid var(--brd);border-radius:3px;color:var(--dim);opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;z-index:30}
+
+/* Journal */
+#jov{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+#jov.vis{opacity:1;pointer-events:all}
+#jbook{width:min(640px,93vw);max-height:82vh;background:#0b1626;border:1px solid var(--brd);border-radius:8px;overflow-y:auto;padding:20px}
+.jtit{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;background:linear-gradient(120deg,#00e5aa,#4da6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:14px;text-align:center}
+.eqcard{background:var(--p2);border:1px solid var(--brd);border-radius:5px;padding:10px 12px;margin-bottom:7px}
+.eqcard.lit{border-color:rgba(0,229,170,.38)}
+.eqcard.lck{opacity:.32;filter:grayscale(.6)}
+.eqf{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--acc);margin-bottom:2px}
+.eqn{font-family:'Orbitron',monospace;font-size:8px;color:var(--dim);margin-bottom:5px;letter-spacing:1px}
+.eqe{font-size:11px;color:var(--txt);line-height:1.65}
+.eqh{font-size:10px;color:var(--dim);font-style:italic;margin-top:3px}
+.jcls{display:block;width:100%;margin-top:14px;padding:9px;background:var(--panel);border:1px solid var(--brd);color:var(--dim);font-family:'Orbitron',monospace;font-size:8px;cursor:pointer;border-radius:4px;transition:all .15s;text-align:center}
+.jcls:hover{color:var(--acc);border-color:var(--acc)}
+
+/* About panel */
+#aov{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+#aov.vis{opacity:1;pointer-events:all}
+#abook{width:min(520px,93vw);max-height:80vh;background:#0b1626;border:1px solid var(--brd);border-radius:8px;overflow-y:auto;padding:20px;text-align:center}
+.atit{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;background:linear-gradient(120deg,#00e5aa,#4da6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.asub{font-family:'Orbitron',monospace;font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:16px}
+.acred{font-family:'Rajdhani',sans-serif;font-size:13px;color:var(--txt);line-height:1.8;margin-bottom:14px}
+.acred strong{color:var(--acc);font-size:15px}
+.abadge{display:inline-block;font-family:'Orbitron',monospace;font-size:9px;color:var(--acc);border:1px solid rgba(0,229,170,.3);border-radius:12px;padding:3px 10px;margin:3px 2px}
+.acls{display:block;width:100%;margin-top:14px;padding:9px;background:var(--panel);border:1px solid var(--brd);color:var(--dim);font-family:'Orbitron',monospace;font-size:8px;cursor:pointer;border-radius:4px;transition:all .15s;text-align:center}
+.acls:hover{color:var(--acc);border-color:var(--acc)}
+
+/* Unlock popup */
+#upop{position:fixed;bottom:64px;left:50%;transform:translateX(-50%) translateY(12px);background:linear-gradient(135deg,rgba(0,35,20,.97),rgba(0,22,44,.97));border:1px solid var(--acc);border-radius:6px;padding:10px 16px;z-index:60;text-align:center;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;min-width:190px}
+#upop.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.ul{font-size:8px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px}
+.uf{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;color:var(--acc)}
+.un{font-family:'Orbitron',monospace;font-size:8px;color:var(--dim);margin-top:2px}
+#tsec{display:none}
+/* Teacher panel uses pre-created spans, no innerHTML rebuild */
+#tcon{font-family:'Orbitron',monospace;font-size:8px;line-height:1.9;color:var(--dim)}
+#tcon .tball{color:#4da6ff}
+#tcon .tsum{color:var(--acc)}
+.tch-row{border-bottom:1px solid #101e30;padding:2px 0;color:#4a6888;font-size:7.5px}
+
+/* ═══ POTENTIAL HEATMAP LEGEND ═══ */
+#potLegend{
+  position:absolute;bottom:8px;right:8px;
+  background:rgba(7,9,15,.82);border:1px solid var(--brd);border-radius:4px;
+  padding:5px 8px;pointer-events:none;z-index:10;display:none;
+}
+#potLegend.vis{display:block}
+.pleg-bar{
+  width:100px;height:8px;border-radius:2px;margin-bottom:3px;
+  background:linear-gradient(to right,#2244ff,#001133 30%,#111 50%,#330000 70%,#ff2200);
+  border:1px solid rgba(255,255,255,.1);
+}
+.pleg-labels{display:flex;justify-content:space-between;font-family:'Orbitron',monospace;font-size:7px;color:var(--dim)}
+.pleg-title{font-family:'Orbitron',monospace;font-size:7px;color:var(--acc);letter-spacing:1px;margin-bottom:3px}
+
+/* ═══ GAUSS MODE BUTTON ═══ */
+#gaussBtn{
+  font-family:'Orbitron',monospace;font-size:8px;font-weight:700;
+  padding:5px 9px;border:1px solid var(--brd);background:var(--p2);
+  color:var(--dim);cursor:pointer;border-radius:3px;transition:all .15s;
+  white-space:nowrap;flex-shrink:0;
+}
+#gaussBtn.on{color:#ffcc00;border-color:rgba(255,204,0,.4);background:rgba(255,204,0,.07);
+  box-shadow:0 0 8px rgba(255,204,0,.2)}
+#gaussBtn:hover:not(.on){color:var(--acc)}
+
+/* Gauss flux readout overlay */
+#gaussHUD{
+  position:absolute;top:8px;right:8px;
+  background:rgba(7,9,15,.88);border:1px solid rgba(255,204,0,.35);border-radius:5px;
+  padding:8px 10px;pointer-events:none;z-index:12;display:none;min-width:150px;
+}
+#gaussHUD.vis{display:block}
+.gh-title{font-family:'Orbitron',monospace;font-size:8px;color:#ffcc00;letter-spacing:1px;margin-bottom:6px}
+.gh-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.gh-lbl{font-size:9px;color:var(--dim);font-family:'Rajdhani',sans-serif}
+.gh-val{font-family:'Orbitron',monospace;font-size:9px;color:#ffcc00;min-width:60px;text-align:right}
+.gh-hint{font-size:8px;color:var(--dim);margin-top:5px;font-family:'Rajdhani',sans-serif;line-height:1.5;border-top:1px solid rgba(255,204,0,.15);padding-top:4px}
+
+/* Potential readout rows */
+#rwVpot{} /* shown at band>=5 */
+
+/* ═══ PUZZLE BADGE / CHARGE LIMIT HUD ═══ */
+#climitHUD{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  background:rgba(7,9,15,.90);border:1px solid rgba(0,229,170,.35);border-radius:5px;
+  padding:5px 12px;pointer-events:none;z-index:12;display:none;
+  font-family:'Orbitron',monospace;font-size:9px;color:var(--acc);
+  white-space:nowrap;letter-spacing:1px;
+}
+#climitHUD.vis{display:block}
+#climitHUD.warn{border-color:rgba(255,68,85,.6);color:#ff8090}
+#climitHUD.full{border-color:rgba(255,68,85,.8);color:var(--red);box-shadow:0 0 10px rgba(255,68,85,.3)}
+
+/* ═══ COMBO HUD ═══ */
+#comboHUD{
+  position:absolute;top:8px;left:8px;
+  background:rgba(7,9,15,.88);border:1px solid rgba(255,200,0,.3);border-radius:5px;
+  padding:5px 10px;pointer-events:none;z-index:12;display:none;
+  font-family:'Orbitron',monospace;font-size:11px;color:#ffcc00;
+  letter-spacing:1px;transition:transform .15s;
+}
+#comboHUD.vis{display:block}
+#comboHUD.pop{transform:scale(1.18)}
+
+/* ═══ POTENTIAL PROBE HUD ═══ */
+#probeHUD{
+  position:absolute;pointer-events:none;z-index:15;display:none;
+  background:rgba(7,9,15,.92);border:1px solid rgba(0,229,170,.3);border-radius:4px;
+  padding:4px 8px;font-family:'Orbitron',monospace;font-size:8px;
+  color:var(--acc);letter-spacing:.5px;white-space:nowrap;
+}
+#probeHUD.vis{display:block}
+
+/* ═══ PUZZLE OBJECTIVE HUD ═══ */
+#puzzleHUD{
+  position:absolute;bottom:8px;left:8px;
+  background:rgba(7,9,15,.88);border:1px solid rgba(0,229,170,.25);border-radius:5px;
+  padding:6px 10px;pointer-events:none;z-index:12;display:none;max-width:220px;
+}
+#puzzleHUD.vis{display:block}
+.ph-title{font-family:'Orbitron',monospace;font-size:7px;color:var(--acc);letter-spacing:1.5px;margin-bottom:3px}
+.ph-obj{font-size:9px;color:var(--txt);line-height:1.55}
+.ph-hint{font-size:8px;color:var(--dim);font-style:italic;margin-top:3px;border-top:1px solid var(--brd);padding-top:3px}
+
+/* ═══ EXPERIMENT PANEL ═══ */
+#expPanel{
+  position:fixed;inset:0;background:rgba(0,0,0,.80);z-index:110;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+#expPanel.vis{opacity:1;pointer-events:all}
+#expBook{
+  width:min(680px,94vw);max-height:85vh;background:#0b1626;
+  border:1px solid var(--brd);border-radius:8px;overflow-y:auto;padding:20px;
+}
+.exp-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:900;
+  background:linear-gradient(120deg,#00e5aa,#4da6ff);-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;margin-bottom:14px;text-align:center}
+.exp-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+.exp-tab{font-family:'Orbitron',monospace;font-size:8px;padding:4px 10px;
+  border:1px solid var(--brd);background:transparent;color:var(--dim);
+  cursor:pointer;border-radius:3px;transition:all .15s}
+.exp-tab.on{border-color:var(--acc);color:var(--acc);background:rgba(0,229,170,.08)}
+.exp-chart-wrap{position:relative;width:100%}
+#expCanvas{background:#07090f;border:1px solid var(--brd);border-radius:4px;display:block;width:100%;height:220px}
+.exp-desc{font-size:10px;color:var(--dim);line-height:1.7;margin-top:10px}
+.exp-ctrls{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.exp-ctrls label{font-size:9px;color:var(--dim);font-family:'Orbitron',monospace}
+.exp-ctrls input[type=range]{flex:1;min-width:80px;accent-color:var(--acc)}
+.exp-close{display:block;width:100%;margin-top:14px;padding:9px;background:var(--panel);
+  border:1px solid var(--brd);color:var(--dim);font-family:'Orbitron',monospace;
+  font-size:8px;cursor:pointer;border-radius:4px;transition:all .15s;text-align:center}
+.exp-close:hover{color:var(--acc);border-color:var(--acc)}
+
+/* ═══ TIME LIMIT HUD ═══ */
+#timerHUD{
+  position:absolute;top:8px;right:50%;transform:translateX(50%);
+  background:rgba(7,9,15,.90);border:1px solid rgba(255,200,0,.35);border-radius:5px;
+  padding:4px 10px;pointer-events:none;z-index:12;display:none;
+  font-family:'Orbitron',monospace;font-size:11px;color:#ffcc00;letter-spacing:1px;
+}
+#timerHUD.vis{display:block}
+#timerHUD.urgent{color:var(--red);border-color:rgba(255,68,85,.6);animation:urgentPulse .5s ease-in-out infinite alternate}
+@keyframes urgentPulse{0%{opacity:1}100%{opacity:.55}}
+
+/* ═══ MOBILE LANDSCAPE — medium screens ═══ */
+@media (orientation:landscape) and (max-height:520px){
+  #hdr{height:38px;min-height:38px;gap:5px;padding:0 6px}
+  .logo{font-size:11px}
+  .gtab{font-size:6px;padding:2px 4px}
+  .lvtab{font-size:7px;padding:2px 6px}
+  .bdg{width:20px;height:20px;font-size:9px}
+  #scrn{font-size:10px}
+  #sbtn{font-size:8px;padding:2px 5px}
+  #ftr{height:40px;min-height:40px;gap:4px}
+  .btn{font-size:8px;padding:5px 8px}
+  #btnL{font-size:9px;padding:6px 11px}
+  .ptog{display:flex}
+  #lp{width:138px;min-width:138px}
+  #rp{width:155px;min-width:155px}
+  .pt{font-size:7px;letter-spacing:1.5px}
+  .rl{font-size:10px}
+  .rv{font-size:8px}
+  .ibox{font-size:9px;padding:5px 6px}
+  #ovm{font-size:18px;padding:10px 20px}
+  #credit{display:none}
+}
+@media (orientation:landscape) and (max-height:420px){
+  .ptog{display:flex}
+  #lp{width:0;min-width:0;padding:0;overflow:hidden}
+  #rp{width:0;min-width:0;padding:0;overflow:hidden}
+  #hdr .gtabs{display:none}
+  #hdr{gap:4px;padding:0 5px}
+  #ftr{gap:3px;padding:0 3px}
+  .btn{font-size:7.5px;padding:4px 7px}
+  #btnL{font-size:8px;padding:5px 9px}
+  #ovm{font-size:15px;padding:8px 16px}
+  #credit{display:none}
+}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--panel)}::-webkit-scrollbar-thumb{background:var(--brd);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- PORTRAIT BLOCKER -->
+<div id="rotmsg">
+  <div class="ico">📱</div>
+  <h2>Rotate Your Device</h2>
+  <p>Electric Field Football is designed for landscape mode. Please rotate your phone or tablet sideways to play.</p>
+  <div class="tip">LANDSCAPE MODE REQUIRED</div>
+</div>
+
+<div id="app">
+
+<!-- HEADER -->
+<div id="hdr">
+  <div class="logo">⚡ E-FIELD FOOTBALL</div>
+  <div class="gtabs">
+    <button class="gtab" data-g="nursery">🌱 Nurs.</button>
+    <button class="gtab" data-g="g13">G1-3</button>
+    <button class="gtab" data-g="g46">G4-6</button>
+    <button class="gtab" data-g="g78">G7-8</button>
+    <button class="gtab on" data-g="g910">G9-10</button>
+    <button class="gtab" data-g="g11">G11</button>
+    <button class="gtab" data-g="g12">G12</button>
+  </div>
+  <div class="lvtabs">
+    <button class="lvtab on" data-l="0">LVL 1</button>
+    <button class="lvtab" data-l="1">LVL 2</button>
+    <button class="lvtab" data-l="2">LVL 3</button>
+    <button class="lvtab" data-l="3">LVL 4</button>
+  </div>
+  <div class="sp"></div>
+  <div id="bdgrow"></div>
+  <div id="scrn">⚽ <span id="scv">0</span></div>
+  <button id="sbtn" class="on">🔊</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT PANEL -->
+  <div id="lp">
+    <button class="ptog" id="lptog"><span>◀</span></button>
+
+    <div>
+      <div class="pt">Place Charges</div>
+      <div class="ctrow">
+        <button class="chtbtn on" id="bPos">⊕</button>
+        <button class="chtbtn" id="bNeg">⊖</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:3px;font-size:9px;font-family:'Orbitron',monospace">
+        <span style="color:var(--red)">RED = +</span>
+        <span style="color:var(--blue)">BLUE = −</span>
+      </div>
+      <div class="mrow" style="margin-top:5px">
+        <button class="mbtn on" data-m="1">S</button>
+        <button class="mbtn" data-m="3">M</button>
+        <button class="mbtn" data-m="6">L</button>
+      </div>
+      <div style="font-size:8px;color:var(--dim);text-align:center;margin-top:2px;font-family:'Orbitron',monospace">SMALL / MED / LARGE</div>
+    </div>
+
+    <div id="ep">
+      <div class="eptit" id="eptit"></div>
+      <!-- FIX: Source charge mass slider removed (had no physics effect, confused students) -->
+      <!-- Ball mass slider shown only when ball is selected (id="epMrow") -->
+      <div class="slrow" id="epMrow" style="display:none">
+        <span class="slbl">m</span>
+        <input type="range" id="slM" min="0.2" max="8" step="0.1" value="1">
+        <span class="sv" id="svM">1.0</span>
+      </div>
+      <div class="slrow">
+        <span class="slbl">q</span>
+        <input type="range" id="slQ" min="0.1" max="10" step="0.1" value="1">
+        <span class="sv" id="svQ">1.0</span>
+      </div>
+      <div class="polrow" id="polrow">
+        <button class="pbtn ra" id="polP">q⁺</button>
+        <button class="pbtn" id="polN">q⁻</button>
+      </div>
+      <button class="rmbtn" id="rmbtn" style="display:none">✕ Remove</button>
+    </div>
+
+    <div>
+      <div class="pt">Controls</div>
+      <div class="ibox">
+        <div><span class="ib">Tap</span> field → place charge</div>
+        <div><span class="ib">Drag</span> → reposition</div>
+        <div><span class="ib">Dbl-tap</span> → remove</div>
+        <div><span class="ib">Tap ball</span> → adjust m &amp; q</div>
+        <div style="color:var(--acc);margin-top:3px">⚡ Drag charges mid-flight!</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="pt">Mission</div>
+      <div class="ibox"><div id="lvdesc" style="font-size:10.5px;line-height:1.65"></div></div>
+    </div>
+
+    <div>
+      <div class="pt">Legend</div>
+      <div class="lgrow"><div class="lgd" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div>Positive (+)</div>
+      <div class="lgrow"><div class="lgd" style="background:var(--blue);box-shadow:0 0 4px var(--blue)"></div>Negative (−)</div>
+      <div class="lgrow"><div class="lgd" style="background:var(--net)"></div>Net field (green)</div>
+      <div class="lgrow"><div class="lgd" style="background:var(--ball)"></div>Ball (test charge)</div>
+      <div class="lgrow" id="lgObs" style="display:none"><div class="lgd" style="background:#ffd040"></div>Obstacle (neutral)</div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="cw">
+    <canvas id="c"></canvas>
+    <div id="ovr"><div id="ovm"></div></div>
+    <div id="toast"></div>
+    <!-- Potential heatmap legend -->
+    <div id="potLegend">
+      <div class="pleg-title">V = kq/r  (POTENTIAL)</div>
+      <div class="pleg-bar"></div>
+      <div class="pleg-labels"><span style="color:#4488ff">− (neg)</span><span>0</span><span style="color:#ff4422">+ (pos)</span></div>
+    </div>
+    <!-- Gauss Law HUD -->
+    <div id="gaussHUD">
+      <div class="gh-title">⬡ GAUSS'S LAW</div>
+      <div class="gh-row"><span class="gh-lbl">Q enclosed</span><span class="gh-val" id="gQ">—</span></div>
+      <div class="gh-row"><span class="gh-lbl">Flux Φ (rel.)</span><span class="gh-val" id="gPhi">—</span></div>
+      <div class="gh-row"><span class="gh-lbl">Charges inside</span><span class="gh-val" id="gN">—</span></div>
+      <div class="gh-hint">Φ = Q<sub>enc</sub>/ε₀ — flux depends only on enclosed charge. Draw a loop around charges to see!</div>
+    </div>
+    <!-- Charge limit HUD -->
+    <div id="climitHUD"></div>
+    <!-- Combo multiplier HUD -->
+    <div id="comboHUD"></div>
+    <!-- Potential probe HUD -->
+    <div id="probeHUD"></div>
+    <!-- Puzzle objective HUD -->
+    <div id="puzzleHUD">
+      <div class="ph-title">⚡ PUZZLE OBJECTIVE</div>
+      <div class="ph-obj" id="ph-obj"></div>
+      <div class="ph-hint" id="ph-hint"></div>
+    </div>
+    <!-- Time limit HUD -->
+    <div id="timerHUD">⏱ <span id="timerVal">—</span></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="rp">
+    <button class="ptog" id="rptog"><span>▶</span></button>
+
+    <div>
+      <div class="pt">Live Physics</div>
+      <!-- FIX: Units clarified as simulation units, not SI -->
+      <div style="font-size:8px;color:var(--dim);font-family:'Orbitron',monospace;margin-bottom:3px;letter-spacing:.5px">sim. units (scaled)</div>
+      <div class="rrow"><span class="rl">Ex</span><span class="rv" id="rEx">—</span></div>
+      <div class="rrow"><span class="rl">Ey</span><span class="rv" id="rEy">—</span></div>
+      <div class="rrow"><span class="rl">|E|</span><span class="rv" id="rEm">—</span></div>
+      <div class="rrow" id="rwVx"><span class="rl">Vx</span><span class="rv" id="rVx">—</span></div>
+      <div class="rrow" id="rwVy"><span class="rl">Vy</span><span class="rv" id="rVy">—</span></div>
+      <div class="rrow"><span class="rl">|V|</span><span class="rv" id="rVm">—</span></div>
+      <div class="rrow" id="rwAx"><span class="rl">Ax</span><span class="rv" id="rAx">—</span></div>
+      <div class="rrow" id="rwAy"><span class="rl">Ay</span><span class="rv" id="rAy">—</span></div>
+      <div class="rrow" id="rwFx"><span class="rl">Fx</span><span class="rv" id="rFx">—</span></div>
+      <div class="rrow" id="rwFy"><span class="rl">Fy</span><span class="rv" id="rFy">—</span></div>
+      <div class="rrow" id="rwVpot"><span class="rl">V (pot.)</span><span class="rv" id="rVpot">—</span></div>
+    </div>
+
+    <div>
+      <div class="pt">Visualize</div>
+      <div class="trow"><input type="checkbox" id="tR" checked><label for="tR">Radial Field Lines</label></div>
+      <div class="trow" id="tNrow"><input type="checkbox" id="tN" checked><label for="tN">Net Field Grid</label></div>
+      <div class="trow"><input type="checkbox" id="tT" checked><label for="tT">Ball Trail</label></div>
+      <div class="trow" id="tVrow"><input type="checkbox" id="tV" checked><label for="tV">Force Vector</label></div>
+      <div class="trow" id="tGrow"><input type="checkbox" id="tG" checked><label for="tG">Ghost Path</label></div>
+      <div class="trow" id="tCrow"><input type="checkbox" id="tC"><label for="tC">Component Arrows</label></div>
+      <div class="trow" id="tHrow"><input type="checkbox" id="tH"><label for="tH">Potential Heatmap</label></div>
+      <div class="trow" id="tErow"><input type="checkbox" id="tE"><label for="tE">Equipotential Lines</label></div>
+    </div>
+
+    <div id="eqbox">
+      <div class="pt">Key Equations</div>
+      <div class="ibox" style="font-family:'Orbitron',monospace;font-size:9px;line-height:2.2" id="eqlist"></div>
+    </div>
+
+    <div id="tsec">
+      <div class="pt">Calculation Steps</div>
+      <div id="tcon">
+        <!-- Pre-created spans for textContent updates (no innerHTML rebuild) -->
+        <div class="tball" id="tc-ball"></div>
+        <div id="tc-charges"></div>
+        <div class="tsum" id="tc-sum"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #main -->
+
+<!-- FOOTER -->
+<div id="ftr">
+  <button class="btn" id="btnL">▶ LAUNCH</button>
+  <button class="btn" id="btnP">⏸ PAUSE</button>
+  <button class="btn" id="btnR">↺ RESET</button>
+  <button class="btn" id="btnC">✕ CLEAR</button>
+  <button class="btn" id="btnJ">📔 JOURNAL</button>
+  <button class="btn" id="btnX">🔬 EXPERIMENT</button>
+  <button class="btn" id="btnA">ℹ ABOUT</button>
+  <button id="gaussBtn">⬡ GAUSS</button>
+  <span id="credit">Created by Kajal Thapar</span>
+</div>
+
+</div><!-- #app -->
+
+<!-- JOURNAL OVERLAY -->
+<div id="jov">
+  <div id="jbook">
+    <div class="jtit">📔 Physics Journal</div>
+    <div style="font-size:10px;color:var(--dim);text-align:center;margin-bottom:14px">Equations unlock as you discover them through play</div>
+    <div id="jent"></div>
+    <button class="jcls" id="jcls">✕ Close Journal</button>
+  </div>
+</div>
+
+<!-- ABOUT OVERLAY -->
+<div id="aov">
+  <div id="abook">
+    <div class="atit">⚡ Electric Field Football</div>
+    <div class="asub">Educational Physics Simulation</div>
+    <div class="acred">
+      <strong>Created and Conceptualized by<br>Kajal Thapar</strong>
+      <br><br>
+      An interactive simulation where students place electric charges to steer a football using electric fields — learning Coulomb's Law, superposition, and Newton's second law through play.
+    </div>
+    <div style="margin-bottom:12px">
+      <div class="abadge">E = kq / r²</div>
+      <div class="abadge">F = qE</div>
+      <div class="abadge">a = F / m</div>
+      <div class="abadge">E_net = Σ Eᵢ</div>
+      <div class="abadge">V = kq / r</div>
+      <div class="abadge">E = −∇V</div>
+      <div class="abadge">Φ = Q/ε₀</div>
+    </div>
+    <div style="font-size:10px;color:var(--dim);line-height:1.8">
+      <strong style="color:var(--acc)">Physics Engine:</strong> Semi-implicit Euler integration<br>
+      with softened Coulomb field (ε-regularization)<br>
+      and field-magnitude clamping for stability.<br><br>
+      <strong style="color:var(--acc)">Grades:</strong> Nursery through Grade 12<br>
+      <strong style="color:var(--acc)">Levels:</strong> 4 progressive challenge levels
+    </div>
+    <button class="acls" id="acls">✕ Close</button>
+  </div>
+</div>
+
+<!-- UNLOCK POPUP -->
+<div id="upop">
+  <div class="ul">🔓 Equation Unlocked!</div>
+  <div class="uf" id="uf"></div>
+  <div class="un" id="un"></div>
+</div>
+
+<!-- EXPERIMENT PANEL -->
+<div id="expPanel">
+  <div id="expBook">
+    <div class="exp-title">🔬 Physics Experiments</div>
+    <div class="exp-tabs">
+      <button class="exp-tab on" data-exp="ev_r">E vs Distance</button>
+      <button class="exp-tab" data-exp="ev_invsq">E vs 1/r²</button>
+      <button class="exp-tab" data-exp="vv_r">V vs Distance</button>
+      <button class="exp-tab" data-exp="vv_invr">V vs 1/r</button>
+    </div>
+    <div class="exp-ctrls">
+      <label>Charge magnitude:</label>
+      <input type="range" id="expQ" min="1" max="10" step="0.5" value="3">
+      <span id="expQval" style="font-family:'Orbitron',monospace;font-size:9px;color:var(--acc);min-width:24px">3.0</span>
+    </div>
+    <div class="exp-chart-wrap">
+      <canvas id="expCanvas"></canvas>
+    </div>
+    <div class="exp-desc" id="expDesc"></div>
+    <button class="exp-close" id="expClose">✕ Close Experiments</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════
+// K is tuned for pixel-space (not SI). Readout labels say "sim. units".
+const K        = 360000;
+const EPSILON2 = 36;        // FIX: softening ε²; r_soft = sqrt(dx²+dy²+ε²), ε≈6px
+const MAX_EM   = 4e6;       // FIX: field magnitude clamp before force computation
+const MINR_VIZ = 24;        // minimum r for visualization / radial lines only
+const MAXSPD   = 640;
+const INITVX   = 92;
+const DAMP     = 0.70;
+const GHOST_DT = 1/120;     // FIX: ghost path uses fixed small dt, not 1/60
+const GHOST_STEPS = 360;    // FIX: more steps with smaller dt ≈ same sim time
+const DBLTAP_MS = 180;      // FIX: delay before placing charge, allows double-tap cancel
+
+const GCFG = {
+  nursery:{band:0,obSpd:0},
+  g13:    {band:1,obSpd:0.35},
+  g46:    {band:2,obSpd:0.65},
+  g78:    {band:3,obSpd:0.95},
+  g910:   {band:4,obSpd:1.30},
+  g11:    {band:5,obSpd:1.65},
+  g12:    {band:6,obSpd:2.00},
+};
+
+const LEVELS = [
+  {name:'First Kick', goalHF:.225, obs:[],
+   puzzleType:'free',   maxCharges:6,  minScore:1, timeLimit:0,
+   desc:'Place a charge and launch! Watch how the electric field curves the ball toward the goal.',
+   hint:'Try a large positive charge above the straight path.',
+   objective:'Score a goal using electric field deflection.',
+   boostZones:[]},
+  {name:'Superposition', goalHF:.155,
+   obs:[{cx:.50,cy:.35,r:.062,pat:'vertical',sp:1.0,rng:.26,ph:0}],
+   puzzleType:'superposition', maxCharges:4, minScore:1, timeLimit:0,
+   desc:'A defender blocks the direct path. Use multiple charges — their fields combine by superposition.',
+   hint:'E_net = E₁ + E₂ — place charges on both sides of the obstacle.',
+   objective:'Score using 2+ charges to navigate the obstacle.',
+   boostZones:[]},
+  {name:'Moving Wall', goalHF:.122,
+   obs:[{cx:.46,cy:.30,r:.058,pat:'vertical',sp:1.0,rng:.27,ph:0},
+        {cx:.62,cy:.70,r:.054,pat:'vertical',sp:1.0,rng:.24,ph:Math.PI}],
+   puzzleType:'precision', maxCharges:5, minScore:1, timeLimit:25,
+   desc:'Two defenders patrol the field. Time your shot or curve past them!',
+   hint:'The Ghost Path shows where the ball will go. Watch the defenders and time it.',
+   objective:'Score past 2 moving defenders within 25 seconds.',
+   boostZones:[{cx:.55,cy:.50,r:.08,amp:1.8}]},
+  {name:'Champions League', goalHF:.080,
+   obs:[{cx:.40,cy:.40,r:.055,pat:'circular',sp:1.1,rng:.13,ph:0},
+        {cx:.60,cy:.30,r:.052,pat:'vertical',sp:1.3,rng:.26,ph:1.1},
+        {cx:.71,cy:.66,r:.052,pat:'horizontal',sp:1.2,rng:.12,ph:.6}],
+   puzzleType:'champion', maxCharges:4, minScore:1, timeLimit:35,
+   desc:'Narrow goal, 3 fast defenders. Precision vector control. Use Component Arrows to plan.',
+   hint:'Plan each charge contribution separately with Component Arrows, then check the ghost path.',
+   objective:'Score with 3 defenders active — max 4 charges, 35 seconds.',
+   boostZones:[{cx:.35,cy:.65,r:.10,amp:2.2},{cx:.70,cy:.40,r:.09,amp:1.6}]},
+];
+
+const EQS = [
+  {id:'invsq',form:'E ∝ 1 / r²',    name:'Inverse Square Law',        exp:'Halve the distance → field quadruples. Distance has a squared effect on field strength.',                         hint:'Move a charge closer to the ball',       gMin:1},
+  {id:'coul', form:'E = kq / r²',   name:"Coulomb's Law",              exp:'Full formula: field = k × charge ÷ distance². Both charge size and distance matter.',                              hint:'Change magnitude S → M → L',             gMin:2},
+  {id:'force',form:'F = qE',        name:'Electric Force',             exp:'Force on ball = its charge × field. Flip ball to q⁻ and the force reverses direction entirely.',                   hint:'Toggle ball polarity q⁺ → q⁻',           gMin:2},
+  {id:'newt2',form:'a = F / m',     name:"Newton's 2nd Law",           exp:'Heavier ball → less acceleration for same force. Feel this directly with the mass slider.',                         hint:'Adjust ball mass with the m slider',      gMin:3},
+  {id:'super',form:'E_net = Σ Eᵢ', name:'Superposition Principle',    exp:'Multiple charges add as vectors at every point. Ball follows the combined net field.',                             hint:'Score using 2 or more charges',           gMin:4},
+  {id:'work', form:'W = F · d',     name:'Work–Energy Theorem',        exp:'Field does work on ball as it moves, increasing kinetic energy. Longer path + stronger field = faster ball.',       hint:'Score from a long curved trajectory',     gMin:5},
+  {id:'pot',  form:'V = kq / r',    name:'Electric Potential',         exp:'Every point near a charge has a voltage. Ball moves from high to low potential — like rolling downhill invisibly.', hint:'Find equilibrium where ball barely moves', gMin:6},
+  {id:'grad', form:'E = −∇V',      name:'Field = Potential Gradient', exp:'Electric field = negative gradient of potential. Field lines always point toward steepest potential decrease.',     hint:'Complete Level 4',                        gMin:7},
+];
+
+const BADGES = [
+  {id:'first', icon:'⚽',label:'First Kick',    desc:'Score your first goal'},
+  {id:'sniper',icon:'🎯',label:'Sniper',         desc:'Score with only 1 charge'},
+  {id:'physi', icon:'🔬',label:'Physicist',      desc:'Unlock 4 equations'},
+  {id:'champ', icon:'🏆',label:'Champion',       desc:'Complete Level 4'},
+  {id:'spiral',icon:'🌀',label:'Spiral Shot',    desc:'Ball curves more than 120°'},
+  {id:'flip',  icon:'🔄',label:'Polarity Flip',  desc:'Score as q⁻ ball'},
+  {id:'boost', icon:'⚡',label:'Field Boost',    desc:'Score through a boost zone'},
+  {id:'combo2',icon:'🔥',label:'Combo x2',       desc:'Score twice without resetting'},
+  {id:'combo3',icon:'💥',label:'Combo x3',       desc:'Score three times in a row'},
+  {id:'opt',   icon:'🏅',label:'Optimal',        desc:'Score using minimum charges'},
+  {id:'speed', icon:'⚡',label:'Speed Goal',     desc:'Score in under 3 seconds'},
+];
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  SOUND ENGINE
+// ═══════════════════════════════════════════════════════════════════════
+const SND = {
+  ax:null, on:true, hOsc:null, hGain:null,
+  init(){
+    if(this.ax) return;
+    try{ this.ax = new(window.AudioContext||window.webkitAudioContext)(); this._hum(); }
+    catch(e){}
+  },
+  go(){ if(this.ax && this.ax.state==='suspended') this.ax.resume(); },
+  _o(f1,f2,dur,type='sine',vol=.18){
+    if(!this.ax||!this.on) return;
+    const o=this.ax.createOscillator(), g=this.ax.createGain();
+    o.type=type; o.frequency.setValueAtTime(f1,this.ax.currentTime);
+    if(f2!==f1) o.frequency.exponentialRampToValueAtTime(Math.max(1,f2),this.ax.currentTime+dur);
+    g.gain.setValueAtTime(vol,this.ax.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,this.ax.currentTime+Math.max(.01,dur));
+    o.connect(g); g.connect(this.ax.destination); o.start(); o.stop(this.ax.currentTime+Math.max(.01,dur)+.02);
+  },
+  _n(dur,vol=.22,lo=200,hi=6000){
+    if(!this.ax||!this.on) return;
+    const buf=this.ax.createBuffer(1,Math.ceil(this.ax.sampleRate*dur),this.ax.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    const s=this.ax.createBufferSource(); s.buffer=buf;
+    const f=this.ax.createBiquadFilter(); f.type='bandpass'; f.frequency.value=(lo+hi)/2; f.Q.value=.7;
+    const g=this.ax.createGain();
+    g.gain.setValueAtTime(vol,this.ax.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,this.ax.currentTime+dur);
+    s.connect(f); f.connect(g); g.connect(this.ax.destination); s.start();
+  },
+  _hum(){
+    if(!this.ax) return;
+    this.hOsc=this.ax.createOscillator(); this.hGain=this.ax.createGain();
+    this.hOsc.type='sine'; this.hOsc.frequency.value=52; this.hGain.gain.value=0;
+    this.hOsc.connect(this.hGain); this.hGain.connect(this.ax.destination); this.hOsc.start();
+  },
+  hum(v,f=52){
+    // FIX: guard both ax and hGain before accessing ax.currentTime
+    if(!this.ax||!this.hGain||!this.on) return;
+    this.hGain.gain.setTargetAtTime(Math.min(.08,v),this.ax.currentTime,.12);
+    if(this.hOsc) this.hOsc.frequency.setTargetAtTime(f,this.ax.currentTime,.12);
+  },
+  stopHum(){
+    if(!this.ax||!this.hGain) return;
+    this.hGain.gain.setTargetAtTime(0,this.ax.currentTime,.05);
+  },
+  play(t){
+    if(!this.ax||!this.on) return; this.go();
+    if(t==='launch') { this._n(.1,.18,400,9000); this._o(180,1100,.18,'sawtooth',.12); }
+    else if(t==='goal') { [523,659,784,1047,1319].forEach((f,i)=>setTimeout(()=>{this._o(f,f,.8,'sine',.18); this._o(f*2,f*1.5,.3,'sine',.06);},i*75)); setTimeout(()=>this._n(2,.28,60,500),50); }
+    else if(t==='bounce') { this._o(220,110,.1,'sine',.14); this._n(.06,.12,80,700); }
+    else if(t==='miss')   { this._o(440,160,.5,'sawtooth',.15); this._n(.25,.1,100,400); }
+    else if(t==='place')  { this._o(1200,900,.07,'sawtooth',.09); this._n(.04,.1,800,8000); }
+    else if(t==='remove') { this._o(700,280,.12,'sawtooth',.1); }
+    else if(t==='unlock') { [880,1108,1320,1760,2093].forEach((f,i)=>setTimeout(()=>this._o(f,f,.3,'sine',.14),i*50)); }
+    else if(t==='badge')  { [440,554,659,880,1108].forEach((f,i)=>setTimeout(()=>this._o(f,f,.22,'sine',.12),i*45)); }
+    else if(t==='whistle'){ this._o(1500,1700,.12,'sine',.2); setTimeout(()=>this._o(1700,1400,.16,'sine',.16),110); }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  GAME STATE
+// ═══════════════════════════════════════════════════════════════════════
+const S = {
+  // Config
+  grade:'g910', level:0,
+  // Physics
+  charges:[], ball:{x:0,y:0,vx:0,vy:0,q:1,m:1}, bStart:{x:0,y:0},
+  obs:[], E:{x:0,y:0},
+  // Rendering buffers
+  trail:new Float32Array(480),  // ring buffer [x0,y0,x1,y1,...] length=240 points
+  trailHead:0, trailCount:0,
+  ghost:[], parts:[],
+  // Cache flags (only rebuild field visuals when charges change)
+  fieldDirty:true,
+  radialCache:null,    // offscreen canvas for field lines
+  gridCache:null,      // offscreen canvas for grid
+  potCache:null,       // offscreen canvas for potential heatmap
+  eqpCache:null,       // offscreen canvas for equipotential lines
+  radialW:0, radialH:0,
+  // Potential grid
+  potGrid:null, potGridW:0, potGridH:0, potGridCols:0, potGridRows:0,
+  potMin:0, potMax:0,
+  // Gauss mode
+  gaussMode:false,
+  gaussPath:[],
+  gaussDrawing:false,
+  // Simulation control
+  running:false, paused:false, animId:null, lastT:0, obT:0,
+  // Selection / drag
+  selType:1, selMag:1, selIdx:-1,
+  dragIdx:-1, dragOff:{x:0,y:0}, dragBall:false,
+  // Input — double-tap (timer-based, no ghost charge)
+  tapTimer:null, pendingPlace:{x:0,y:0}, pendingType:0, pendingMag:0,
+  lastTapX:0, lastTapY:0, lastTapT:0,
+  // Scoring / progression
+  score:0, totalCurve:0, prevAng:null,
+  unlocked:new Set(), badgesEarned:new Set(),
+  // UI timers
+  toastTmr:null, upopTmr:null,
+  // ── v4 NEW STATE ──────────────────────────────────────────────────────
+  // Puzzle system
+  comboCount:0,         // consecutive goals without a reset
+  comboMul:1,           // score multiplier (1×, 2×, 3×)
+  // Time limit system
+  timeLeft:0,           // seconds remaining (0 = no limit)
+  timerInterval:null,   // setInterval handle for countdown
+  launchTime:0,         // performance.now() at launch (for speed badge)
+  // Boost zones (array built from LEVELS[level].boostZones)
+  boostZones:[],
+  // Probe tracking
+  probeX:0, probeY:0, probeVis:false,
+  // Experiment mode
+  expMode:'ev_r',       // current experiment type
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  CANVAS & FIELD BOUNDS
+// ═══════════════════════════════════════════════════════════════════════
+const cv  = document.getElementById('c');
+const ctx = cv.getContext('2d');
+// Safe defaults — prevent NaN in gradients before first resize()
+let FL=0,FR=1,FT=0,FB=1,FW=1,FH=1,FCX=0.5,FCY=0.5;
+
+// ─── DPR-AWARE RESIZE ────────────────────────────────────────────────
+// Canvas LOGICAL size = container pixel size (fills all available space).
+// Canvas PHYSICAL size = logical × devicePixelRatio for crisp rendering on
+// Retina, HiDPI, OLED, and any high-density display.
+// ctx is scaled once by DPR so all drawing coordinates stay in CSS pixels.
+let DPR = 1;  // current device pixel ratio
+
+function resize(){
+  const cw_el = document.getElementById('cw');
+  const lw = Math.floor(cw_el.clientWidth);
+  const lh = Math.floor(cw_el.clientHeight);
+
+  // Always update DPR and bounds even if canvas size unchanged
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+
+  if(lw >= 10 && lh >= 10){
+    const physW = Math.round(lw * DPR);
+    const physH = Math.round(lh * DPR);
+
+    if(cv.width !== physW || cv.height !== physH){
+      cv.width  = physW;
+      cv.height = physH;
+    }
+    // Always (re-)apply transform — canvas size assignment resets it
+    cv.style.width  = lw + 'px';
+    cv.style.height = lh + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    bounds(); buildObs(); bstart();
+    S.fieldDirty = true;
+    S.radialCache = null; S.gridCache = null;
+    S.potCache    = null; S.eqpCache  = null;
+    calcGhost(); render();
+  }
+}
+
+// Logical canvas dimensions (CSS pixels) — used everywhere in physics & drawing
+function logW(){ return cv.width  / DPR; }
+function logH(){ return cv.height / DPR; }
+
+function bounds(){
+  // All coordinates in LOGICAL pixels (ctx already scaled by DPR)
+  const W = logW(), H = logH();
+  const mx = W * 0.082, my = H * 0.088;
+  FL = mx;  FR = W - mx * 0.50;
+  FT = my;  FB = H - my;
+  FW = FR - FL;  FH = FB - FT;
+  FCX = (FL + FR) / 2;  FCY = (FT + FB) / 2;
+}
+
+function bstart(){
+  S.ball = {...S.ball, x:FL+FW*.082, y:FCY, vx:0, vy:0};
+  S.bStart = {x:S.ball.x, y:S.ball.y};
+}
+
+function ballR()      { return Math.max(9, logW()*.013); }
+function chR(mag)     { const b=Math.max(11,logW()*.016); return mag===1?b:mag===3?b*1.3:b*1.62; }
+function inField(x,y) { return x>FL+2&&x<FR-2&&y>FT+2&&y<FB-2; }
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  OBSTACLES
+// ═══════════════════════════════════════════════════════════════════════
+function buildObs(){
+  S.obs = LEVELS[S.level].obs.map(o=>({
+    x:FL+o.cx*FW, y:FT+o.cy*FH,
+    ox:FL+o.cx*FW, oy:FT+o.cy*FH,
+    r:o.r, pat:o.pat, sp:o.sp, rng:o.rng, ph:o.ph||0
+  }));
+  // Build boost zones in pixel space
+  const bz = LEVELS[S.level].boostZones || [];
+  S.boostZones = bz.map(z=>({
+    cx: FL + z.cx*FW,
+    cy: FT + z.cy*FH,
+    r:  z.r * Math.min(FW,FH),
+    amp: z.amp
+  }));
+  document.getElementById('lgObs').style.display = S.obs.length ? 'flex' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  PHYSICS ENGINE
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * FIX: Softened Coulomb field using ε-regularization.
+ * r_soft = sqrt(dx² + dy² + ε²)  → no singularity at origin.
+ * Field magnitude clamped at MAX_EM before force computation.
+ * Returns {Ex, Ey, det} where det is per-charge breakdown for teacher panel.
+ */
+function fieldAt(px, py){
+  let Ex=0, Ey=0;
+  const det=[];
+  for(let i=0; i<S.charges.length; i++){
+    const c  = S.charges[i];
+    const dx = px - c.x, dy = py - c.y;
+    const r2 = dx*dx + dy*dy + EPSILON2;
+    const r  = Math.sqrt(r2);
+    const qMag = Math.abs(c.q) * c.mag;
+    const Em = Math.min(K * qMag / r2, MAX_EM);
+    const sg = c.q > 0 ? 1 : -1;
+    const ex = sg * Em * (dx/r);
+    const ey = sg * Em * (dy/r);
+    Ex += ex; Ey += ey;
+    det.push({i, qv:c.q*c.mag, r:r.toFixed(0), em:Em.toFixed(1), ex:ex.toFixed(1), ey:ey.toFixed(1)});
+  }
+  // ── v4: boost zone amplification ────────────────────────────────────
+  for(const bz of S.boostZones){
+    const dist = Math.hypot(px-bz.cx, py-bz.cy);
+    if(dist < bz.r){
+      const frac = 1 - dist/bz.r; // 1 at center, 0 at edge
+      const amp = 1 + (bz.amp - 1) * frac;
+      Ex *= amp; Ey *= amp;
+    }
+  }
+  return {Ex, Ey, det};
+}
+
+/**
+ * Electric potential V = Σ kqᵢ/rᵢ (scalar superposition).
+ * Uses softened distance for consistency with fieldAt.
+ * Returns total potential in simulation units.
+ */
+function potentialAt(px, py){
+  let V = 0;
+  for(let i=0; i<S.charges.length; i++){
+    const c  = S.charges[i];
+    const dx = px - c.x, dy = py - c.y;
+    // softened r for potential: sqrt(dx²+dy²+ε²)
+    const r  = Math.sqrt(dx*dx + dy*dy + EPSILON2);
+    // signed charge: q*mag (positive or negative)
+    const qSigned = c.q * c.mag;
+    V += K * qSigned / r;
+  }
+  return V;
+}
+
+/**
+ * Build coarse potential grid across the field.
+ * Grid cells: PGRID_COLS × PGRID_ROWS — recomputed only when fieldDirty.
+ * Used by heatmap (interpolated blit) and equipotential marching-squares.
+ */
+const PGRID_COLS = 60;
+const PGRID_ROWS = 36;
+
+function buildPotGrid(){
+  if(!S.potGrid || S.potGrid.length !== PGRID_COLS*PGRID_ROWS){
+    S.potGrid = new Float32Array(PGRID_COLS * PGRID_ROWS);
+  }
+  S.potGridCols = PGRID_COLS;
+  S.potGridRows = PGRID_ROWS;
+  let mn=Infinity, mx=-Infinity;
+  for(let row=0; row<PGRID_ROWS; row++){
+    const y = FT + (row/(PGRID_ROWS-1))*FH;
+    for(let col=0; col<PGRID_COLS; col++){
+      const x = FL + (col/(PGRID_COLS-1))*FW;
+      const v = potentialAt(x,y);
+      const idx = row*PGRID_COLS+col;
+      S.potGrid[idx] = v;
+      if(v<mn) mn=v; if(v>mx) mx=v;
+    }
+  }
+  // Symmetric clamp for balanced color scale
+  const absMax = Math.max(Math.abs(mn),Math.abs(mx),1);
+  S.potMin = -absMax;
+  S.potMax =  absMax;
+}
+
+
+/**
+ * Semi-implicit (symplectic) Euler integration.
+ * velocity updated from acceleration, THEN position updated from new velocity.
+ * This conserves energy better than forward Euler for oscillatory systems.
+ * Also: NaN guard — if physics diverges, simulation stops gracefully.
+ */
+function step(dt){
+  if(!S.running || S.paused) return;
+
+  const {Ex, Ey, det} = fieldAt(S.ball.x, S.ball.y);
+
+  // FIX: NaN guard
+  if(!isFinite(Ex) || !isFinite(Ey)){
+    endRound('FIELD ERROR\nSingularity!','miss',false);
+    return;
+  }
+
+  const Fx = S.ball.q * Ex;
+  const Fy = S.ball.q * Ey;
+  const ax  = Fx / S.ball.m;
+  const ay  = Fy / S.ball.m;
+
+  // Semi-implicit Euler: update velocity first, then use new velocity for position
+  S.ball.vx += ax * dt;
+  S.ball.vy += ay * dt;
+
+  // Speed clamp
+  const sp = Math.hypot(S.ball.vx, S.ball.vy);
+  if(sp > MAXSPD){ S.ball.vx *= MAXSPD/sp; S.ball.vy *= MAXSPD/sp; }
+
+  // Position update uses updated velocity (symplectic)
+  const prevX = S.ball.x, prevY = S.ball.y;
+  S.ball.x += S.ball.vx * dt;
+  S.ball.y += S.ball.vy * dt;
+
+  S.E = {x:Ex, y:Ey};
+
+  // Curve tracking for badges/unlocks
+  if(sp > 10){
+    const ang = Math.atan2(S.ball.vy, S.ball.vx);
+    if(S.prevAng !== null){
+      let da = ang - S.prevAng;
+      while(da >  Math.PI) da -= 2*Math.PI;
+      while(da < -Math.PI) da += 2*Math.PI;
+      S.totalCurve += Math.abs(da);
+    }
+    S.prevAng = ang;
+    if(S.totalCurve > Math.PI*.5)   checkUnlock('invsq');
+    if(S.totalCurve > Math.PI*4/3)  awardBadge('spiral');
+  }
+
+  // Trail — FIX: ring buffer using Float32Array, no O(N) shift
+  const ti = S.trailHead * 2;
+  S.trail[ti]   = S.ball.x;
+  S.trail[ti+1] = S.ball.y;
+  S.trailHead   = (S.trailHead + 1) % 240;
+  if(S.trailCount < 240) S.trailCount++;
+
+  // Particles
+  const em = Math.hypot(Ex, Ey);
+  if(em > 600 && Math.random() < .12){
+    S.parts.push({
+      x:S.ball.x+(Math.random()-.5)*14, y:S.ball.y+(Math.random()-.5)*14,
+      vx:(Math.random()-.5)*80, vy:(Math.random()-.5)*80,
+      life:1, r:2+Math.random()*2.5,
+      col:S.ball.q>0?[0,255,140]:[255,200,0]
+    });
+  }
+  S.parts = S.parts.filter(p=>{ p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt*3; return p.life>0; });
+
+  readout(Ex, Ey, ax, ay, Fx, Fy);
+  if(GCFG[S.grade].band >= 5) teacherUpdate(Ex, Ey, ax, ay, det);
+
+  SND.hum(Math.min(.08, em*7e-6), 52 + Math.min(260, em*2.2e-4));
+
+  // v4: boost zone badge check
+  for(const bz of S.boostZones){
+    if(Math.hypot(S.ball.x-bz.cx,S.ball.y-bz.cy) < bz.r) awardBadge('boost');
+  }
+
+  collide(prevX, prevY);
+}
+
+function moveObs(dt){
+  S.obT += dt;
+  const mul = GCFG[S.grade].obSpd;
+  S.obs.forEach((ob,i)=>{
+    const cfg = LEVELS[S.level].obs[i];
+    if(!cfg || mul===0) return;
+    const sp = cfg.sp * mul;
+    if(cfg.pat==='vertical')
+      ob.y = ob.oy + Math.sin(S.obT*sp + ob.ph)*cfg.rng*FH;
+    else if(cfg.pat==='horizontal')
+      ob.x = ob.ox + Math.sin(S.obT*sp + ob.ph)*cfg.rng*FW;
+    else if(cfg.pat==='circular'){
+      const r2 = cfg.rng * Math.min(FW,FH);
+      ob.x = ob.ox + Math.cos(S.obT*sp + ob.ph)*r2;
+      ob.y = ob.oy + Math.sin(S.obT*sp + ob.ph)*r2;
+    }
+  });
+}
+
+/**
+ * FIX: Continuous goal-line detection via sub-step interpolation.
+ * Ball can move up to ~21px/frame at MAXSPD; interpolation catches crossings.
+ * prevX/prevY = position at start of frame.
+ */
+function collide(prevX, prevY){
+  const b=S.ball, br=ballR();
+  const lv=LEVELS[S.level];
+  const gy1=FCY-FH*lv.goalHF, gy2=FCY+FH*lv.goalHF;
+  const gd=FW*.040;
+
+  // FIX: continuous goal detection — interpolate across the frame
+  // Check if ball crossed FR between prevX and b.x
+  if(prevX + br <= FR && b.x + br > FR){
+    // Find interpolated y at the moment x+br == FR
+    const t = (FR - br - prevX) / (b.x - prevX);
+    const iy = prevY + t*(b.y - prevY);
+    if(iy > gy1 && iy < gy2){ goalFx(); endRound('⚽  GOAL!','goal',true); return; }
+  }
+  // Standard goal check (if ball starts already past FR)
+  if(b.x + br > FR && b.y > gy1 && b.y < gy2){ goalFx(); endRound('⚽  GOAL!','goal',true); return; }
+
+  // Wall bounces
+  let bn=false;
+  if(b.y - br < FT){ b.y=FT+br; b.vy= Math.abs(b.vy)*DAMP; bn=true; }
+  if(b.y + br > FB){ b.y=FB-br; b.vy=-Math.abs(b.vy)*DAMP; bn=true; }
+  if(b.x - br < FL){ b.x=FL+br; b.vx= Math.abs(b.vx)*DAMP; bn=true; }
+  if(bn) SND.play('bounce');
+
+  if(b.x + br > FR && (b.y < gy1 || b.y > gy2)){
+    b.x=FR-br; b.vx=-Math.abs(b.vx)*DAMP; SND.play('bounce');
+  }
+
+  // Miss detection
+  if(b.x > FR + gd + br*4){ endRound('MISSED!\nTry Again','miss',false); return; }
+
+  // Obstacle collision
+  for(const ob of S.obs){
+    const or = ob.r * Math.min(FW,FH);
+    if(Math.hypot(b.x-ob.x, b.y-ob.y) < or+br){
+      SND.play('whistle');
+      endRound('🟨 YELLOW CARD!\nHit a Defender','card',false);
+      return;
+    }
+  }
+}
+
+function goalFx(){
+  for(let i=0;i<70;i++){
+    const ang=Math.random()*Math.PI*2, spd=90+Math.random()*240;
+    S.parts.push({
+      x:S.ball.x, y:S.ball.y,
+      vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+      life:1, r:2+Math.random()*5,
+      col:Math.random()>.5?[0,229,170]:[255,200,0]
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  GHOST PATH
+// ═══════════════════════════════════════════════════════════════════════
+/**
+ * FIX: Ghost path now uses GHOST_DT (1/120 s) instead of hardcoded 1/60.
+ * Same semi-implicit Euler as main sim. Same speed clamp.
+ * FIX: Ghost path checks obstacle collisions — correctly shows blocked paths.
+ */
+function calcGhost(){
+  const el = document.getElementById('tG');
+  if(!el || !el.checked || GCFG[S.grade].band < 4){ S.ghost=[]; return; }
+
+  let bx = S.running ? S.ball.x : S.bStart.x;
+  let by = S.running ? S.ball.y : S.bStart.y;
+  let vx = S.running ? S.ball.vx : INITVX;
+  let vy = S.running ? S.ball.vy : 0;
+
+  const pts = [{x:bx, y:by}];
+  const gy1 = FCY - FH*LEVELS[S.level].goalHF;
+  const gy2 = FCY + FH*LEVELS[S.level].goalHF;
+  const br  = ballR();
+
+  for(let i=0; i<GHOST_STEPS; i++){
+    const {Ex, Ey} = fieldAt(bx, by);
+    if(!isFinite(Ex)||!isFinite(Ey)) break;
+
+    // FIX: Semi-implicit Euler for ghost (matches main sim)
+    const ax2 = S.ball.q * Ex / S.ball.m;
+    const ay2 = S.ball.q * Ey / S.ball.m;
+    vx += ax2 * GHOST_DT;
+    vy += ay2 * GHOST_DT;
+
+    const sp = Math.hypot(vx,vy);
+    if(sp > MAXSPD){ vx*=MAXSPD/sp; vy*=MAXSPD/sp; }
+
+    const px0 = bx, py0 = by;
+    bx += vx * GHOST_DT;
+    by += vy * GHOST_DT;
+    pts.push({x:bx, y:by});
+
+    // FIX: goal check in ghost
+    if(px0+br<=FR && bx+br>FR){
+      const t=(FR-br-px0)/(bx-px0);
+      const iy=py0+t*(by-py0);
+      if(iy>gy1&&iy<gy2) break; // goal — stop path here
+    }
+    if(bx+br>FR && by>gy1 && by<gy2) break;
+
+    // FIX: ghost respects obstacles — stops at defender
+    let hitObs = false;
+    for(const ob of S.obs){
+      const or = ob.r * Math.min(FW,FH);
+      if(Math.hypot(bx-ob.x, by-ob.y) < or+br){ hitObs=true; break; }
+    }
+    if(hitObs) break;
+
+    if(bx<FL-20 || bx>FR+FW*.18 || by<FT-20 || by>FB+20) break;
+  }
+  S.ghost = pts;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  GAME FLOW
+// ═══════════════════════════════════════════════════════════════════════
+function launch(){
+  if(S.running) return;
+  // v4: enforce charge limit
+  const lv = LEVELS[S.level];
+  if(S.charges.length === 0){ toast('⚠ Place at least one charge first!'); return; }
+  SND.init(); SND.play('launch');
+  S.ball.vx = INITVX; S.ball.vy = 0;
+  S.running = true; S.paused = false;
+  S.lastT = performance.now();
+  S.launchTime = S.lastT;  // v4: for speed badge
+  S.prevAng = null; S.totalCurve = 0;
+  document.getElementById('btnL').disabled = true;
+  hideOverlay();
+  // v4: start countdown timer if level has time limit
+  if(lv.timeLimit > 0){
+    S.timeLeft = lv.timeLimit;
+    updateTimerHUD();
+    document.getElementById('timerHUD').classList.add('vis');
+    S.timerInterval = setInterval(()=>{
+      if(!S.running || S.paused) return;
+      S.timeLeft -= 1;
+      updateTimerHUD();
+      if(S.timeLeft <= 0){
+        clearInterval(S.timerInterval); S.timerInterval = null;
+        if(S.running) endRound('⏱ TIME UP!\nTry Again','miss',false);
+      }
+    }, 1000);
+  }
+  S.animId = requestAnimationFrame(loop);
+}
+
+function updateTimerHUD(){
+  const el = document.getElementById('timerHUD');
+  const tv = document.getElementById('timerVal');
+  if(!el||!tv) return;
+  tv.textContent = S.timeLeft + 's';
+  el.classList.toggle('urgent', S.timeLeft <= 8);
+}
+
+function togglePause(){
+  if(!S.running) return;
+  S.paused = !S.paused;
+  document.getElementById('btnP').textContent = S.paused ? '▶ RESUME' : '⏸ PAUSE';
+  if(!S.paused) S.lastT = performance.now();
+}
+
+function resetBall(){
+  cancelAnimationFrame(S.animId);
+  // v4: stop timer
+  if(S.timerInterval){ clearInterval(S.timerInterval); S.timerInterval=null; }
+  document.getElementById('timerHUD').classList.remove('vis');
+
+  S.running=false; S.paused=false;
+  // v4 FULL RESET — return to exact level start state
+  S.charges=[];
+  S.selIdx=-1;
+  bstart();
+  // Clear trail ring buffer
+  S.trailHead=0; S.trailCount=0;
+  S.ghost=[]; S.parts=[]; S.E={x:0,y:0};
+  S.prevAng=null; S.totalCurve=0; S.obT=0;
+  // Rebuild obstacles to starting positions
+  buildObs();
+  // Invalidate ALL caches (charges cleared, need fresh render)
+  S.fieldDirty=true;
+  S.radialCache=null; S.gridCache=null;
+  S.potCache=null; S.eqpCache=null;
+  // Reset Gauss mode
+  S.gaussMode=false; S.gaussPath=[]; S.gaussDrawing=false;
+  document.getElementById('gaussBtn').classList.remove('on');
+  document.getElementById('gaussHUD').classList.remove('vis');
+  // v4: reset combo if no goal (combo reset happens on miss, not on goal)
+  // NOTE: combo is preserved across resets triggered by endRound(isGoal=true)
+  document.getElementById('btnL').disabled=false;
+  document.getElementById('btnP').textContent='⏸ PAUSE';
+  hideOverlay();
+  updateEntityPanel();
+  updateChargeLimitHUD();
+  updatePuzzleHUD();
+  const ids=['rEx','rEy','rEm','rVx','rVy','rVm','rAx','rAy','rFx','rFy','rVpot'];
+  ids.forEach(id=>{ const e=document.getElementById(id); if(e) e.textContent='—'; });
+  SND.stopHum();
+  calcGhost(); render();
+}
+
+function clearAll(){
+  S.charges=[]; S.selIdx=-1; S.fieldDirty=true;
+  S.radialCache=null; S.gridCache=null; S.potCache=null; S.eqpCache=null;
+  updateEntityPanel();
+  updateChargeLimitHUD();
+  resetBall();
+}
+
+function setLevel(idx){
+  S.level=idx; S.charges=[]; S.selIdx=-1;
+  document.querySelectorAll('.lvtab').forEach((t,i)=>t.classList.toggle('on',i===idx));
+  document.getElementById('lvdesc').textContent = LEVELS[idx].desc;
+  cancelAnimationFrame(S.animId);
+  if(S.timerInterval){ clearInterval(S.timerInterval); S.timerInterval=null; }
+  document.getElementById('timerHUD').classList.remove('vis');
+  S.running=false; S.paused=false;
+  bounds(); buildObs(); bstart();
+  S.trailHead=0; S.trailCount=0; S.ghost=[]; S.parts=[]; S.E={x:0,y:0}; S.obT=0;
+  S.fieldDirty=true;
+  S.radialCache=null; S.gridCache=null; S.potCache=null; S.eqpCache=null;
+  S.gaussMode=false; S.gaussPath=[]; S.gaussDrawing=false;
+  document.getElementById('gaussBtn').classList.remove('on');
+  document.getElementById('gaussHUD').classList.remove('vis');
+  document.getElementById('btnL').disabled=false;
+  document.getElementById('btnP').textContent='⏸ PAUSE';
+  SND.stopHum(); hideOverlay(); updateEntityPanel();
+  updateChargeLimitHUD(); updatePuzzleHUD();
+  render();
+}
+
+function setGrade(g){
+  S.grade=g;
+  document.querySelectorAll('.gtab').forEach(t=>t.classList.toggle('on',t.dataset.g===g));
+  const band=GCFG[g].band;
+  const show=(id,min)=>{ const e=document.getElementById(id); if(e) e.style.display=band>=min?'':'none'; };
+  show('rwVx',3); show('rwVy',3); show('rwAx',4); show('rwAy',4);
+  show('rwFx',4); show('rwFy',4);
+  show('rwVpot',5);
+  show('tNrow',3); show('tVrow',3); show('tGrow',4); show('tCrow',4);
+  show('tHrow',5);
+  show('tErow',6);
+  show('tsec',5); show('eqbox',2);
+  // Gauss mode button visibility
+  const gb=document.getElementById('gaussBtn');
+  if(gb) gb.style.display=band>=6?'':'none';
+  // v4: experiment button visible from G7+
+  const xb=document.getElementById('btnX');
+  if(xb) xb.style.display=band>=3?'':'none';
+  buildEqSidebar(band); buildBadges();
+  updateChargeLimitHUD(); updatePuzzleHUD();
+  calcGhost(); render();
+}
+
+function endRound(msg, type, isGoal){
+  S.running=false; cancelAnimationFrame(S.animId);
+  // v4: stop timer
+  if(S.timerInterval){ clearInterval(S.timerInterval); S.timerInterval=null; }
+  document.getElementById('timerHUD').classList.remove('vis');
+
+  if(isGoal){
+    // v4: combo system
+    S.comboCount++;
+    S.comboMul = S.comboCount >= 3 ? 3 : S.comboCount >= 2 ? 2 : 1;
+    const pts = S.comboMul;
+    S.score += pts;
+    document.getElementById('scv').textContent = S.score;
+    updateComboHUD();
+
+    SND.play('goal');
+    awardBadge('first');
+    if(S.charges.length===1) awardBadge('sniper');
+    if(S.ball.q<0) awardBadge('flip');
+    if(S.level===3) awardBadge('champ');
+    if(S.charges.length>=2) checkUnlock('super');
+    checkUnlock('coul'); checkUnlock('work');
+    // v4: combo badges
+    if(S.comboCount>=2) awardBadge('combo2');
+    if(S.comboCount>=3) awardBadge('combo3');
+    // v4: optimal badge — scored with minimum charges (1 charge on any level)
+    const lv=LEVELS[S.level];
+    if(S.charges.length<=1) awardBadge('opt');
+    // v4: speed badge — goal in under 3 seconds
+    const elapsed = (performance.now() - S.launchTime)/1000;
+    if(elapsed < 3.0) awardBadge('speed');
+    // Goal message shows combo
+    const comboStr = S.comboMul>1 ? `\n🔥 COMBO ×${S.comboMul}!` : '';
+    showOverlay('⚽  GOAL!' + comboStr, 'goal');
+  } else {
+    // v4: miss resets combo
+    S.comboCount=0; S.comboMul=1;
+    updateComboHUD();
+    SND.play('miss');
+    showOverlay(msg, type);
+  }
+  render();
+  setTimeout(()=>resetBall(), isGoal?2500:3200);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  v4 PUZZLE / HUD HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+
+function updateChargeLimitHUD(){
+  const lv=LEVELS[S.level];
+  const el=document.getElementById('climitHUD');
+  if(!el) return;
+  const max=lv.maxCharges, used=S.charges.length;
+  const rem=max-used;
+  el.textContent=`⊕ ${used}/${max} charges`;
+  el.classList.toggle('vis', true);
+  el.classList.toggle('warn', rem===1);
+  el.classList.toggle('full', rem===0);
+}
+
+function updatePuzzleHUD(){
+  const lv=LEVELS[S.level];
+  const band=GCFG[S.grade].band;
+  const el=document.getElementById('puzzleHUD');
+  const obj=document.getElementById('ph-obj');
+  const hint=document.getElementById('ph-hint');
+  if(!el||!obj||!hint) return;
+  if(band<2){ el.classList.remove('vis'); return; }
+  el.classList.add('vis');
+  obj.textContent=lv.objective||lv.desc;
+  hint.textContent=`Hint: ${lv.hint}`;
+}
+
+function updateComboHUD(){
+  const el=document.getElementById('comboHUD');
+  if(!el) return;
+  if(S.comboMul>1){
+    el.textContent=`🔥 COMBO ×${S.comboMul}`;
+    el.classList.add('vis');
+    el.classList.add('pop');
+    setTimeout(()=>el.classList.remove('pop'),200);
+  } else {
+    el.classList.remove('vis');
+  }
+}
+
+function canPlaceCharge(){
+  const lv=LEVELS[S.level];
+  if(S.charges.length >= lv.maxCharges){
+    toast(`⚠ Charge limit: max ${lv.maxCharges} charges for this puzzle`);
+    return false;
+  }
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  v4 EXPERIMENT MODE
+// ═══════════════════════════════════════════════════════════════════════
+
+const EXP_DESCS = {
+  ev_r:    'Electric field E = kq/r² decreases with distance r. Notice the steep falloff — doubling the distance reduces field strength by 4×.',
+  ev_invsq:'Plot of E vs 1/r² shows a straight line through the origin, confirming the inverse-square law. Slope = kq.',
+  vv_r:    'Electric potential V = kq/r decreases more slowly than E. V falls as 1/r while E falls as 1/r².',
+  vv_invr: 'Plot of V vs 1/r is linear, confirming V ∝ 1/r. Slope = kq. Compare with E vs 1/r² — same slope, different axis!',
+};
+
+function drawExperiment(){
+  const cvEl=document.getElementById('expCanvas');
+  if(!cvEl) return;
+  const w=cvEl.clientWidth||600, h=220;
+  cvEl.width=w; cvEl.height=h;
+  const c=cvEl.getContext('2d');
+  c.clearRect(0,0,w,h);
+
+  const q=parseFloat(document.getElementById('expQ')?.value||3);
+  const mode=S.expMode;
+  const pad={l:48,r:16,t:18,b:36};
+  const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
+
+  // Generate data
+  const pts=[];
+  const nPts=80;
+  for(let i=1;i<=nPts;i++){
+    const r=6+(i/nPts)*(FW*.6||300); // px distance range
+    const E=Math.min(K*q*1/(r*r),MAX_EM);
+    const V=K*q/r;
+    const inv2=1/(r*r);
+    const inv1=1/r;
+    if(mode==='ev_r')    pts.push({x:r,    y:E});
+    else if(mode==='ev_invsq') pts.push({x:inv2*1e6,y:E});
+    else if(mode==='vv_r')    pts.push({x:r,    y:V});
+    else if(mode==='vv_invr') pts.push({x:inv1*1e3,y:V});
+  }
+
+  const xMin=pts[0].x, xMax=pts[pts.length-1].x;
+  const yMax=Math.max(...pts.map(p=>p.y))*1.08;
+  const yMin=0;
+  const sx=v=>(v-xMin)/(xMax-xMin)*cw+pad.l;
+  const sy=v=>(1-(v-yMin)/(yMax-yMin||1))*ch+pad.t;
+
+  // Grid
+  c.strokeStyle='rgba(28,46,72,.8)'; c.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=pad.t+i/4*ch;
+    c.beginPath(); c.moveTo(pad.l,y); c.lineTo(pad.l+cw,y); c.stroke();
+    const v=(yMax*(1-i/4)).toExponential(1);
+    c.fillStyle='rgba(80,104,136,.9)'; c.font='8px Orbitron,monospace';
+    c.textAlign='right'; c.textBaseline='middle';
+    c.fillText(v,pad.l-4,y);
+  }
+  for(let i=0;i<=4;i++){
+    const x=pad.l+i/4*cw;
+    c.beginPath(); c.moveTo(x,pad.t); c.lineTo(x,pad.t+ch); c.stroke();
+    const v=((xMin+(xMax-xMin)*i/4)).toFixed(1);
+    c.fillStyle='rgba(80,104,136,.9)'; c.font='7px Orbitron,monospace';
+    c.textAlign='center'; c.textBaseline='top';
+    c.fillText(v,x,pad.t+ch+4);
+  }
+  // Axes
+  c.strokeStyle='rgba(80,104,136,.6)'; c.lineWidth=1.5;
+  c.beginPath(); c.moveTo(pad.l,pad.t); c.lineTo(pad.l,pad.t+ch); c.lineTo(pad.l+cw,pad.t+ch); c.stroke();
+  // Curve
+  const grad=c.createLinearGradient(pad.l,0,pad.l+cw,0);
+  grad.addColorStop(0,'#4488ff'); grad.addColorStop(1,'#00e5aa');
+  c.strokeStyle=grad; c.lineWidth=2.5; c.beginPath();
+  pts.forEach((p,i)=>{ const fx=sx(p.x),fy=sy(p.y); i===0?c.moveTo(fx,fy):c.lineTo(fx,fy); });
+  c.stroke();
+  // Axis labels
+  const xLbl=mode==='ev_r'||mode==='vv_r'?'r (px)':mode==='ev_invsq'?'1/r² ×10⁻⁶':'1/r ×10⁻³';
+  const yLbl=mode.startsWith('e')?'E (field)':'V (potential)';
+  c.fillStyle='rgba(0,229,170,.8)'; c.font='9px Orbitron,monospace'; c.textAlign='center';
+  c.fillText(xLbl, pad.l+cw/2, h-5);
+  c.save(); c.translate(12,pad.t+ch/2); c.rotate(-Math.PI/2);
+  c.fillText(yLbl,0,0); c.restore();
+  // Title
+  const titles={ev_r:'E vs r',ev_invsq:'E vs 1/r²',vv_r:'V vs r',vv_invr:'V vs 1/r'};
+  c.fillStyle='rgba(189,211,240,.9)'; c.font='bold 10px Orbitron,monospace'; c.textAlign='center';
+  c.fillText(titles[mode], pad.l+cw/2, pad.t-5);
+}
+
+function openExperiment(){
+  document.getElementById('expPanel').classList.add('vis');
+  const dEl=document.getElementById('expDesc');
+  if(dEl) dEl.textContent=EXP_DESCS[S.expMode]||'';
+  drawExperiment();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  v4 POTENTIAL PROBE
+// ═══════════════════════════════════════════════════════════════════════
+function showProbe(x, y){
+  if(!S.charges.length) return;
+  const V = potentialAt(x,y);
+  const {Ex,Ey}=fieldAt(x,y);
+  const Em=Math.hypot(Ex,Ey);
+  const el=document.getElementById('probeHUD');
+  if(!el) return;
+  const fmt=v=>Math.abs(v)<1000?v.toFixed(1):v.toExponential(2);
+  el.textContent=`V=${fmt(V)}  |E|=${fmt(Em)}`;
+  // Position HUD near cursor but keep in bounds
+  const cw_el=document.getElementById('cw');
+  const rect=cw_el.getBoundingClientRect();
+  const lx=x/logW()*rect.width, ly=y/logH()*rect.height;
+  el.style.left=Math.min(lx+14, rect.width-160)+'px';
+  el.style.top=Math.max(ly-28,4)+'px';
+  el.classList.add('vis');
+}
+function hideProbe(){
+  const el=document.getElementById('probeHUD');
+  if(el) el.classList.remove('vis');
+}
+
+
+function loop(ts){
+  if(!S.running) return;
+  if(!S.paused){
+    const dt = Math.min((ts-S.lastT)/1000, .033);
+    S.lastT = ts;
+    step(dt);
+    moveObs(dt);
+    calcGhost();
+    render();
+  }
+  S.animId = requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  RENDERING ENGINE
+// ═══════════════════════════════════════════════════════════════════════
+
+function render(){
+  // Guard: skip render if bounds not yet initialized (FW/FH===0 or canvas not ready)
+  if(FW <= 0 || FH <= 0 || logW() <= 0 || logH() <= 0) return;
+  ctx.clearRect(0,0,logW(),logH());
+  drawField();
+  // v4: draw boost zones underneath everything
+  drawBoostZones();
+  const band = GCFG[S.grade].band;
+  // Potential heatmap — drawn first (underneath everything)
+  if(band>=5 && document.getElementById('tH')?.checked && S.charges.length) drawPotentialHeatmap();
+  // Equipotential contour lines
+  if(band>=6 && document.getElementById('tE')?.checked && S.charges.length) drawEquipotential();
+  if(band>=1 && document.getElementById('tR').checked && S.charges.length) drawRadial();
+  if(band>=3 && document.getElementById('tN')?.checked && S.charges.length) drawNetGrid();
+  if(document.getElementById('tT').checked) drawTrail();
+  drawGhost();
+  drawParts();
+  drawObs();
+  drawCharges();
+  drawBall();
+  if(band>=3 && document.getElementById('tV')?.checked && S.charges.length) drawVectors();
+  // Gauss surface drawing
+  if(S.gaussMode) drawGaussSurface();
+  // Always clear dirty flag at end of render — caches have been rebuilt if needed
+  S.fieldDirty = false;
+}
+
+function drawField(){
+  const ns=12, sw=FW/ns;
+  for(let i=0;i<ns;i++){
+    ctx.fillStyle = i%2===0 ? '#1e5c1e' : '#195419';
+    ctx.fillRect(FL+i*sw, FT, sw, FH);
+  }
+  ctx.strokeStyle='rgba(255,255,255,.88)'; ctx.lineWidth=2;
+  ctx.strokeRect(FL,FT,FW,FH);
+  ln(FCX,FT,FCX,FB,'rgba(255,255,255,.72)',1.5);
+  arc2(FCX,FCY,FH*.22,'rgba(255,255,255,.72)',1.5);
+  dot(FCX,FCY,3,'white');
+
+  const pw=FW*.165, ph=FH*.56;
+  ctx.strokeStyle='rgba(255,255,255,.60)'; ctx.lineWidth=1.5;
+  ctx.strokeRect(FL,FCY-ph/2,pw,ph);
+  ctx.strokeRect(FR-pw,FCY-ph/2,pw,ph);
+  const gbw=FW*.068, gbh=FH*.29;
+  ctx.strokeRect(FL,FCY-gbh/2,gbw,gbh);
+  ctx.strokeRect(FR-gbw,FCY-gbh/2,gbw,gbh);
+  dot(FL+pw*.65,FCY,2.5,'rgba(255,255,255,.60)');
+  dot(FR-pw*.65,FCY,2.5,'rgba(255,255,255,.60)');
+
+  const cr=FH*.052;
+  [[FL,FT,0,Math.PI/2],[FR,FT,Math.PI/2,Math.PI],[FR,FB,Math.PI,1.5*Math.PI],[FL,FB,1.5*Math.PI,2*Math.PI]]
+    .forEach(([cx,cy,s,e])=>{
+      ctx.beginPath(); ctx.arc(cx,cy,cr,s,e);
+      ctx.strokeStyle='rgba(255,255,255,.60)'; ctx.lineWidth=1.5; ctx.stroke();
+    });
+
+  dot(S.bStart.x,S.bStart.y,3.5,'rgba(255,255,255,.38)');
+  ctx.fillStyle='rgba(255,255,255,.28)';
+  ctx.font=`${Math.max(7,logW()*.009)}px Rajdhani`;
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText('KICK-OFF',S.bStart.x,FT-3);
+
+  const lv=LEVELS[S.level];
+  const gy1=FCY-FH*lv.goalHF, gy2=FCY+FH*lv.goalHF;
+  const gd=Math.max(2, FW*.040); // FIX: minimum 2px — prevents degenerate gradient (start==end)
+  if(!isFinite(FR)||!isFinite(gd)) return; // FIX: bail if bounds not valid
+  const ng=ctx.createLinearGradient(FR,0,FR+gd,0);
+  ng.addColorStop(0,'rgba(0,229,170,.22)'); ng.addColorStop(1,'rgba(0,229,170,.04)');
+  ctx.fillStyle=ng; ctx.fillRect(FR,gy1,gd,gy2-gy1);
+
+  ctx.save(); ctx.shadowColor='#00e5aa'; ctx.shadowBlur=14;
+  ctx.strokeStyle='rgba(0,229,170,.55)'; ctx.lineWidth=1.8;
+  ctx.beginPath(); ctx.moveTo(FR,gy1); ctx.lineTo(FR+gd,gy1); ctx.lineTo(FR+gd,gy2); ctx.lineTo(FR,gy2); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(FR,gy1); ctx.lineTo(FR+gd,gy1); ctx.lineTo(FR+gd,gy2); ctx.lineTo(FR,gy2); ctx.stroke();
+  ctx.fillStyle='rgba(0,229,170,.72)';
+  ctx.font=`bold ${Math.max(7,logW()*.010)}px Orbitron`;
+  ctx.textAlign='right'; ctx.textBaseline='bottom';
+  ctx.fillText('GOAL',FR+gd-3,gy1-4);
+}
+
+// v4: Draw field boost zones — pulsing radial glow indicating amplified E field
+function drawBoostZones(){
+  if(!S.boostZones.length) return;
+  const t = (Date.now() % 1800) / 1800;
+  const pulse = 0.5 + 0.5*Math.sin(t*Math.PI*2);
+  for(const bz of S.boostZones){
+    if(!isFinite(bz.cx)||!isFinite(bz.cy)||bz.r<=0) continue;
+    const gr=ctx.createRadialGradient(bz.cx,bz.cy,0,bz.cx,bz.cy,Math.max(1,bz.r));
+    gr.addColorStop(0,`rgba(255,220,0,${(0.18+0.10*pulse).toFixed(3)})`);
+    gr.addColorStop(0.6,`rgba(255,180,0,${(0.08+0.06*pulse).toFixed(3)})`);
+    gr.addColorStop(1,'rgba(255,160,0,0)');
+    ctx.fillStyle=gr;
+    ctx.beginPath(); ctx.arc(bz.cx,bz.cy,bz.r,0,Math.PI*2); ctx.fill();
+    ctx.save();
+    ctx.strokeStyle=`rgba(255,200,0,${(0.35+0.25*pulse).toFixed(2)})`;
+    ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.arc(bz.cx,bz.cy,bz.r*(0.9+0.06*pulse),0,Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=`rgba(255,210,0,${(0.55+0.25*pulse).toFixed(2)})`;
+    ctx.font=`bold ${Math.max(8,bz.r*.18)}px Orbitron`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(`×${bz.amp.toFixed(1)}`,bz.cx,bz.cy);
+    ctx.restore();
+  }
+}
+
+/**
+ * Radial field lines drawn to offscreen canvas (radialCache).
+ * Only rebuilt when S.fieldDirty is true (charges changed position/mag).
+ * Main render blits the cache — no per-frame fieldAt() calls for lines.
+ */
+function drawRadial(){
+  const band = GCFG[S.grade].band;
+  const nL = band>=4 ? 16 : 10;
+
+  // Rebuild cache if dirty or canvas size changed (compare logical dims)
+  const lw=logW(), lh=logH();
+  if(S.fieldDirty || !S.radialCache || S.radialW!==lw || S.radialH!==lh){
+    if(!S.radialCache){ S.radialCache=document.createElement('canvas'); }
+    S.radialCache.width = lw; S.radialCache.height = lh;
+    S.radialW=lw; S.radialH=lh;
+    const rc = S.radialCache.getContext('2d');
+    rc.clearRect(0,0,lw,lh);
+
+    S.charges.forEach(ch=>{
+      const isP = ch.q>0;
+      const bc  = isP ? [255,68,85] : [68,136,255];
+      const cr  = chR(ch.mag);
+      for(let a=0;a<nL;a++){
+        const ang = (a/nL)*Math.PI*2;
+        let px = ch.x + Math.cos(ang)*cr;
+        let py = ch.y + Math.sin(ang)*cr;
+        rc.beginPath(); rc.moveTo(px,py);
+        for(let st=0;st<120;st++){
+          const {Ex,Ey} = fieldAt(px,py);
+          const em = Math.hypot(Ex,Ey); if(em<0.4) break;
+          const nx = isP?Ex/em:-Ex/em, ny = isP?Ey/em:-Ey/em;
+          const ds = Math.max(2.5, Math.min(9, 6500/em));
+          px+=nx*ds; py+=ny*ds;
+          if(px<FL-15||px>FR+FW*.14||py<FT-15||py>FB+15) break;
+          const dist  = Math.hypot(px-ch.x, py-ch.y);
+          const alpha = Math.max(0, .72*Math.exp(-dist/(cr*9)));
+          rc.strokeStyle = `rgba(${bc[0]},${bc[1]},${bc[2]},${alpha.toFixed(2)})`;
+          rc.lineWidth   = Math.max(.4, 1.4*(1-dist/(cr*16)));
+          rc.lineTo(px,py); rc.stroke(); rc.beginPath(); rc.moveTo(px,py);
+          if(alpha<.025) break;
+        }
+      }
+    });
+  }
+
+  ctx.drawImage(S.radialCache,0,0);
+}
+
+/**
+ * FIX: Net field grid drawn to offscreen canvas (gridCache).
+ * Only rebuilt when S.fieldDirty. Main render blits cache.
+ */
+function drawNetGrid(){
+  const lw=logW(), lh=logH();
+  if(S.fieldDirty || !S.gridCache || S.gridCache.width!==lw || S.gridCache.height!==lh){
+    if(!S.gridCache){ S.gridCache=document.createElement('canvas'); }
+    S.gridCache.width=lw; S.gridCache.height=lh;
+    const gc = S.gridCache.getContext('2d');
+    gc.clearRect(0,0,lw,lh);
+
+    const step=Math.max(34,Math.min(lw/20,52)), ml=step*.56;
+    for(let x=FL+step*.8; x<FR; x+=step){
+      for(let y=FT+step*.8; y<FB; y+=step){
+        const {Ex,Ey} = fieldAt(x,y);
+        const mag = Math.hypot(Ex,Ey); if(mag<0.4) continue;
+        const len = Math.min(ml, Math.max(5, Math.log1p(mag*.0003)*ml*1.5));
+        const nx=Ex/mag, ny=Ey/mag;
+        const al = Math.min(.55, .1+(len/ml)*.5);
+        gc.strokeStyle=`rgba(70,190,255,${al})`; gc.fillStyle=`rgba(70,190,255,${al})`; gc.lineWidth=.9;
+        arwCtx(gc,x-nx*len*.4,y-ny*len*.4,x+nx*len*.6,y+ny*len*.6,5,.9);
+      }
+    }
+  }
+  // During simulation obstacles move, so grid cells near obstacles may be stale,
+  // but for performance we accept this — grid is decorative, not authoritative.
+  ctx.drawImage(S.gridCache,0,0);
+}
+
+// ─── POTENTIAL HEATMAP ────────────────────────────────────────────────
+/**
+ * v4 UPGRADED: Electric Potential Heatmap.
+ * Uses vivid red–white–blue palette, normal compositing, stronger alpha (0.72).
+ * Per-pixel interpolation for smooth gradients.
+ */
+function drawPotentialHeatmap(){
+  const lw=logW(), lh=logH();
+  const needRebuild = S.fieldDirty
+    || !S.potCache
+    || S.potCache.width !== lw
+    || S.potCache.height !== lh;
+
+  if(needRebuild){
+    buildPotGrid();
+    if(!S.potCache) S.potCache = document.createElement('canvas');
+    S.potCache.width  = lw;
+    S.potCache.height = lh;
+    const pc = S.potCache.getContext('2d');
+    pc.clearRect(0, 0, lw, lh);
+
+    const cellW = FW / (PGRID_COLS - 1);
+    const cellH = FH / (PGRID_ROWS - 1);
+    const range = S.potMax - S.potMin;
+
+    for(let row=0; row<PGRID_ROWS-1; row++){
+      for(let col=0; col<PGRID_COLS-1; col++){
+        // Bilinear interpolated average of 4 corners for smooth gradients
+        const v00 = S.potGrid[row*PGRID_COLS + col];
+        const v10 = S.potGrid[row*PGRID_COLS + col+1];
+        const v01 = S.potGrid[(row+1)*PGRID_COLS + col];
+        const v11 = S.potGrid[(row+1)*PGRID_COLS + col+1];
+        const vAvg = (v00+v10+v01+v11)*0.25;
+
+        const t   = range>0 ? Math.max(0,Math.min(1,(vAvg - S.potMin)/range)) : 0.5;
+        // v4: vivid alpha 0.72 (was 0.38), normal composite
+        pc.fillStyle = potColor(t, 0.72);
+        const px = FL + col*cellW;
+        const py = FT + row*cellH;
+        pc.fillRect(Math.floor(px), Math.floor(py), Math.ceil(cellW)+1, Math.ceil(cellH)+1);
+      }
+    }
+  }
+
+  ctx.save();
+  // v4: use 'normal' compositing so heatmap colors are true — 'screen' was washing everything out
+  ctx.globalCompositeOperation = 'normal';
+  ctx.globalAlpha = 0.70;
+  ctx.drawImage(S.potCache, 0, 0);
+  ctx.restore();
+
+  document.getElementById('potLegend').classList.add('vis');
+}
+
+/**
+ * v4 UPGRADED: vivid red–white–blue heatmap.
+ * t=0 → deep blue (most negative)
+ * t=0.5 → near-white (zero potential)
+ * t=1 → deep red (most positive)
+ * Much more visible than v3 dark-center approach.
+ */
+function potColor(t, alpha){
+  let r,g,b;
+  if(t < 0.5){
+    // blue → white: t=0 → (20,80,255), t=0.5 → (240,245,255)
+    const s = t * 2;  // 0→1
+    r = Math.round(20  + (240-20)  * s);
+    g = Math.round(80  + (245-80)  * s);
+    b = Math.round(255 + (255-255) * s);
+  } else {
+    // white → red: t=0.5 → (240,245,255), t=1 → (255,30,20)
+    const s = (t-0.5)*2;  // 0→1
+    r = Math.round(240 + (255-240) * s);
+    g = Math.round(245 + (30-245)  * s);
+    b = Math.round(255 + (20-255)  * s);
+  }
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ─── EQUIPOTENTIAL LINES ──────────────────────────────────────────────
+/**
+ * v4 UPGRADED: Equipotential contour lines.
+ * Thicker lines (2.0/3.0), brighter colors, more levels (18).
+ * E = −∇V → field lines always perpendicular to these contours.
+ */
+const EQP_LEVELS = 18;  // v4: was 14
+
+function drawEquipotential(){
+  const lw2=logW(), lh2=logH();
+  const needRebuild = S.fieldDirty
+    || !S.eqpCache
+    || S.eqpCache.width !== lw2
+    || S.eqpCache.height !== lh2;
+
+  if(needRebuild){
+    if(!S.potGrid || S.fieldDirty) buildPotGrid();
+    if(!S.eqpCache) S.eqpCache = document.createElement('canvas');
+    S.eqpCache.width  = lw2;
+    S.eqpCache.height = lh2;
+    const ec = S.eqpCache.getContext('2d');
+    ec.clearRect(0, 0, lw2, lh2);
+
+    const cellW = FW / (PGRID_COLS - 1);
+    const cellH = FH / (PGRID_ROWS - 1);
+    const step  = (S.potMax - S.potMin) / (EQP_LEVELS + 1);
+
+    for(let li=1; li<=EQP_LEVELS; li++){
+      const level = S.potMin + li * step;
+      const t     = (level - S.potMin) / Math.max(S.potMax - S.potMin, 1);
+
+      // v4: vivid colors with high alpha
+      let strokeColor, lw;
+      if(t < 0.38){
+        strokeColor = `rgba(60,120,255,0.90)`;  // strong blue for negative
+        lw = 2.0;
+      } else if(t > 0.62){
+        strokeColor = `rgba(255,60,40,0.90)`;   // strong red for positive
+        lw = 2.0;
+      } else if(t > 0.44 && t < 0.56){
+        strokeColor = `rgba(220,240,255,0.80)`;  // bright cyan-white at zero
+        lw = 2.5;
+      } else {
+        strokeColor = `rgba(140,190,255,0.75)`;
+        lw = 1.6;
+      }
+
+      ec.strokeStyle = strokeColor;
+      ec.lineWidth   = lw;
+      marchSquares(ec, level, cellW, cellH);
+    }
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 1.0;  // v4: was 0.88 — full opacity for clear visibility
+  ctx.drawImage(S.eqpCache, 0, 0);
+  ctx.restore();
+}
+
+/**
+ * Marching squares contour for a single iso-level.
+ * 16 cases → 0 and 15 are uniform (skip), rest produce line segments.
+ */
+function marchSquares(c, level, cellW, cellH){
+  const G=S.potGrid, nc=PGRID_COLS, nr=PGRID_ROWS;
+  for(let row=0; row<nr-1; row++){
+    for(let col=0; col<nc-1; col++){
+      const v00=G[row*nc+col], v10=G[row*nc+col+1];
+      const v01=G[(row+1)*nc+col], v11=G[(row+1)*nc+col+1];
+      const x0=FL+col*cellW, x1=FL+(col+1)*cellW;
+      const y0=FT+row*cellH, y1=FT+(row+1)*cellH;
+
+      const a=v00>=level?1:0, b=v10>=level?1:0;
+      const d=v01>=level?1:0, e=v11>=level?1:0;
+      const idx=a*8+b*4+e*2+d;
+      if(idx===0||idx===15) continue;
+
+      const lp=(va,vb,xa,ya,xb,yb)=>{
+        const dv=vb-va; const t=Math.abs(dv)<1e-12?0:(level-va)/dv;
+        return [xa+t*(xb-xa), ya+t*(yb-ya)];
+      };
+      const top   =()=>lp(v00,v10,x0,y0,x1,y0);
+      const right =()=>lp(v10,v11,x1,y0,x1,y1);
+      const bottom=()=>lp(v01,v11,x0,y1,x1,y1);
+      const left  =()=>lp(v00,v01,x0,y0,x0,y1);
+      const seg=(p1,p2)=>{ c.beginPath(); c.moveTo(p1[0],p1[1]); c.lineTo(p2[0],p2[1]); c.stroke(); };
+
+      switch(idx){
+        case 1: case 14: seg(bottom(),left()); break;
+        case 2: case 13: seg(right(),bottom()); break;
+        case 3: case 12: seg(right(),left()); break;
+        case 4: case 11: seg(top(),right()); break;
+        case 5:          seg(top(),right()); seg(bottom(),left()); break;
+        case 6: case 9:  seg(top(),bottom()); break;
+        case 7: case 8:  seg(top(),left()); break;
+        case 10:         seg(top(),right()); seg(left(),bottom()); break;
+      }
+    }
+  }
+}
+
+// ─── GAUSS MODE ───────────────────────────────────────────────────────
+/**
+ * Gauss's Law: Φ = ∮ E·dA = Q_enclosed / ε₀
+ * Student draws a closed Gaussian surface (loop) on the canvas.
+ * System uses ray-casting to find enclosed charges, reports flux.
+ * Key insight shown: Φ depends ONLY on Q_enclosed, not surface shape.
+ */
+function drawGaussSurface(){
+  if(!S.gaussPath.length) return;
+  ctx.save();
+  ctx.setLineDash([6,4]);
+  ctx.strokeStyle = S.gaussDrawing ? 'rgba(255,220,0,.65)' : 'rgba(255,220,0,.92)';
+  ctx.lineWidth   = S.gaussDrawing ? 1.5 : 2.4;
+  ctx.shadowColor = '#ffdd00'; ctx.shadowBlur = S.gaussDrawing ? 4 : 12;
+  ctx.beginPath();
+  ctx.moveTo(S.gaussPath[0].x, S.gaussPath[0].y);
+  for(let i=1;i<S.gaussPath.length;i++) ctx.lineTo(S.gaussPath[i].x, S.gaussPath[i].y);
+  if(!S.gaussDrawing) ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  if(!S.gaussDrawing && S.gaussPath.length>3){
+    ctx.globalAlpha=0.07; ctx.fillStyle='#ffdd00';
+    ctx.beginPath();
+    ctx.moveTo(S.gaussPath[0].x, S.gaussPath[0].y);
+    for(let i=1;i<S.gaussPath.length;i++) ctx.lineTo(S.gaussPath[i].x, S.gaussPath[i].y);
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha=1;
+
+    gaussUpdateHUD();
+  }
+  ctx.restore();
+}
+
+function pointInPoly(px,py,poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x,yi=poly[i].y,xj=poly[j].x,yj=poly[j].y;
+    if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+
+function gaussUpdateHUD(){
+  let qEnc=0,nEnc=0,ballIn=false;
+  S.charges.forEach(c=>{
+    if(pointInPoly(c.x,c.y,S.gaussPath)){ qEnc+=c.q*c.mag; nEnc++; }
+  });
+  if(pointInPoly(S.ball.x,S.ball.y,S.gaussPath)){ qEnc+=S.ball.q; nEnc++; ballIn=true; }
+
+  const fmt=v=>v===0?'0':(Math.abs(v)<100?v.toFixed(2):v.toExponential(2));
+  const sign=v=>v>=0?'+'+fmt(v):fmt(v);
+  document.getElementById('gQ').textContent   = sign(qEnc)+' (sim)';
+  document.getElementById('gPhi').textContent = sign(qEnc)+' (∝ Q/ε₀)';
+  document.getElementById('gN').textContent   = nEnc+(ballIn?' (incl. ball)':'');
+  document.getElementById('gaussHUD').classList.add('vis');
+
+  // Gold glow on enclosed charges
+  ctx.save();
+  ctx.shadowColor='#ffdd00'; ctx.shadowBlur=22;
+  ctx.strokeStyle='rgba(255,220,0,.85)'; ctx.lineWidth=2.5;
+  S.charges.forEach(c=>{
+    if(pointInPoly(c.x,c.y,S.gaussPath)){
+      ctx.beginPath(); ctx.arc(c.x,c.y,chR(c.mag)+6,0,Math.PI*2); ctx.stroke();
+    }
+  });
+  ctx.restore();
+}
+
+function toggleGaussMode(){
+  S.gaussMode=!S.gaussMode;
+  S.gaussPath=[]; S.gaussDrawing=false;
+  document.getElementById('gaussBtn').classList.toggle('on',S.gaussMode);
+  const hud=document.getElementById('gaussHUD');
+  if(!S.gaussMode){
+    hud.classList.remove('vis');
+    ['gQ','gPhi','gN'].forEach(id=>document.getElementById(id).textContent='—');
+  }
+  render();
+}
+
+function drawTrail(){
+  if(S.trailCount < 2) return;
+  // FIX: Draw trail from ring buffer without shift()
+  // Walk backward from trailHead-1 (most recent) to trailHead-trailCount (oldest)
+  ctx.save();
+  for(let i=1; i<S.trailCount; i++){
+    const i2 = ((S.trailHead - i - 1) + 240) % 240;
+    const i1 = ((S.trailHead - i)     + 240) % 240;
+    const p1x=S.trail[i1*2], p1y=S.trail[i1*2+1];
+    const p2x=S.trail[i2*2], p2y=S.trail[i2*2+1];
+    const frac = 1 - i/S.trailCount;
+    ctx.strokeStyle=`rgba(255,155,0,${(frac*.7).toFixed(2)})`;
+    ctx.lineWidth  = Math.max(.5, frac*4);
+    ctx.beginPath(); ctx.moveTo(p1x,p1y); ctx.lineTo(p2x,p2y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawGhost(){
+  const el=document.getElementById('tG');
+  if(!el||!el.checked||!S.ghost.length||GCFG[S.grade].band<4) return;
+  ctx.save();
+  ctx.setLineDash([4,6]);
+  for(let i=1;i<S.ghost.length;i++){
+    const al = (1-i/S.ghost.length)*.4;
+    const p1=S.ghost[i-1], p2=S.ghost[i];
+    ctx.strokeStyle=`rgba(0,255,160,${al})`;
+    ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawParts(){
+  for(const p of S.parts){
+    ctx.fillStyle=`rgba(${p.col[0]},${p.col[1]},${p.col[2]},${p.life.toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawObs(){
+  for(const ob of S.obs){
+    const or = ob.r * Math.min(FW,FH);
+    if(or <= 0 || !isFinite(ob.x) || !isFinite(ob.y)) continue; // FIX: skip if degenerate
+    const gl=ctx.createRadialGradient(ob.x,ob.y,0,ob.x,ob.y,Math.max(1,or*2.2));
+    gl.addColorStop(0,'rgba(160,120,0,.3)'); gl.addColorStop(1,'rgba(160,120,0,0)');
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(ob.x,ob.y,or*2.2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#2a1e00'; ctx.beginPath(); ctx.arc(ob.x,ob.y,or,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(255,200,20,.85)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#ffd040';
+    ctx.font=`bold ${or*.75}px Orbitron`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('N',ob.x,ob.y);
+    if(ob.pat!=='none' && GCFG[S.grade].obSpd>0){
+      ctx.setLineDash([3,7]);
+      if(ob.pat==='vertical')
+        ln(ob.ox,ob.oy-ob.rng*FH,ob.ox,ob.oy+ob.rng*FH,'rgba(255,200,20,.13)',1);
+      else if(ob.pat==='horizontal')
+        ln(ob.ox-ob.rng*FW,ob.oy,ob.ox+ob.rng*FW,ob.oy,'rgba(255,200,20,.13)',1);
+      else if(ob.pat==='circular'){
+        const r2=ob.rng*Math.min(FW,FH);
+        ctx.beginPath(); ctx.arc(ob.ox,ob.oy,r2,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,200,20,.13)'; ctx.lineWidth=1; ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+function drawCharges(){
+  for(let i=0;i<S.charges.length;i++){
+    const c=S.charges[i], r=chR(c.mag), isP=c.q>0;
+    if(r <= 0 || !isFinite(c.x) || !isFinite(c.y)) continue; // FIX: skip degenerate
+    const bc=isP?[255,68,85]:[68,136,255];
+    const gl=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,Math.max(1,r*3));
+    gl.addColorStop(0,`rgba(${bc},.38)`); gl.addColorStop(1,`rgba(${bc},0)`);
+    ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(c.x,c.y,r*3,0,Math.PI*2); ctx.fill();
+    const bg=ctx.createRadialGradient(c.x-r*.28,c.y-r*.3,Math.max(0.01,r*.05),c.x,c.y,Math.max(1,r));
+    bg.addColorStop(0,isP?'#ff9999':'#99bbff'); bg.addColorStop(1,`rgb(${bc})`);
+    ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(c.x,c.y,r,0,Math.PI*2); ctx.fill();
+    if(S.selIdx===i){
+      ctx.strokeStyle='white'; ctx.lineWidth=2; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle=isP?'#ff9999':'#88aaff'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+    ctx.fillStyle='white';
+    ctx.font=`bold ${r*1.18}px Rajdhani`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(isP?'+':'−',c.x,c.y+(isP?0:1));
+    const ml=c.mag===1?'S':c.mag===3?'M':'L';
+    ctx.fillStyle='rgba(255,255,255,.48)';
+    ctx.font=`${r*.5}px Orbitron`;
+    ctx.textBaseline='top'; ctx.fillText(ml,c.x,c.y+r+3);
+    if(GCFG[S.grade].band>=3){
+      // FIX: show |q|*mag as effective field strength, not confusing 'm' of source charge
+      ctx.fillStyle='rgba(255,255,255,.32)';
+      ctx.font=`${r*.42}px Orbitron`;
+      ctx.textBaseline='bottom';
+      ctx.fillText(`q${(c.mag).toFixed(1)}`,c.x,c.y-r-3);
+    }
+  }
+}
+
+function drawBall(){
+  const b=S.ball, r=ballR();
+  if(r <= 0 || !isFinite(b.x) || !isFinite(b.y)) return; // FIX: skip if degenerate
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,.22)';
+  ctx.beginPath(); ctx.ellipse(b.x+2,b.y+r*.5,r*.84,r*.33,0,0,Math.PI*2); ctx.fill();
+  // Glow
+  const gl=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,Math.max(1,r*2.4));
+  gl.addColorStop(0,'rgba(255,185,0,.26)'); gl.addColorStop(1,'rgba(255,185,0,0)');
+  ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(b.x,b.y,r*2.4,0,Math.PI*2); ctx.fill();
+  // Body
+  const bg=ctx.createRadialGradient(b.x-r*.3,b.y-r*.33,Math.max(0.01,r*.05),b.x,b.y,Math.max(1,r));
+  bg.addColorStop(0,'#fff8cc'); bg.addColorStop(.35,'#ffc030'); bg.addColorStop(1,'#b05000');
+  ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(b.x,b.y,r,0,Math.PI*2); ctx.fill();
+  if(S.selIdx===-2){
+    ctx.strokeStyle='white'; ctx.lineWidth=2.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(b.x,b.y,r,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // Seams
+  ctx.strokeStyle='rgba(0,0,0,.26)'; ctx.lineWidth=.9;
+  ctx.beginPath(); ctx.arc(b.x,b.y,r*.52,-.4,Math.PI+.4); ctx.stroke();
+  ctx.beginPath(); ctx.arc(b.x,b.y,r*.52,Math.PI-.4,2*Math.PI+.4); ctx.stroke();
+  // Label
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  ctx.font=`bold ${r*.62}px Orbitron`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(b.q>0?'q⁺':'q⁻',b.x,b.y);
+  if(GCFG[S.grade].band>=3){
+    ctx.fillStyle='rgba(255,255,255,.38)';
+    ctx.font=`${r*.4}px Orbitron`;
+    ctx.textBaseline='top';
+    ctx.fillText(`m${b.m.toFixed(1)}`,b.x,b.y+r+3);
+  }
+}
+
+function drawVectors(){
+  const b=S.ball, {x:Ex,y:Ey}=S.E;
+  const mag=Math.hypot(Ex,Ey); if(mag<0.4) return;
+  const r=ballR();
+  const lv2=Math.min(FH*.40, Math.max(20, Math.log1p(mag*.0003)*FH*.44));
+
+  if(document.getElementById('tC')?.checked && GCFG[S.grade].band>=4){
+    for(const c of S.charges){
+      const dx=b.x-c.x, dy=b.y-c.y;
+      // FIX: use same softened distance as fieldAt
+      const r2=dx*dx+dy*dy+EPSILON2, rr=Math.sqrt(r2);
+      const qMag=Math.abs(c.q)*c.mag;
+      const em=Math.min(K*qMag/r2, MAX_EM);
+      const sg=c.q>0?1:-1;
+      const ex=sg*em*(dx/rr), ey=sg*em*(dy/rr);
+      const emag=Math.hypot(ex,ey); if(emag<0.4) continue;
+      const clen=Math.min(lv2*.7, Math.max(10, Math.log1p(emag*.0003)*lv2*.75));
+      const nx2=ex/emag, ny2=ey/emag, isP=c.q>0;
+      ctx.strokeStyle=isP?'rgba(255,100,100,.7)':'rgba(80,160,255,.7)';
+      ctx.fillStyle  =isP?'rgba(255,100,100,.7)':'rgba(80,160,255,.7)';
+      ctx.lineWidth=1.5;
+      arw(b.x,b.y,b.x+nx2*clen,b.y+ny2*clen,5,1.5);
+      ctx.fillStyle=isP?'rgba(255,140,140,.8)':'rgba(120,180,255,.8)';
+      ctx.font=`${Math.max(7,r*.58)}px Rajdhani`;
+      ctx.textAlign='left'; ctx.textBaseline='bottom';
+      ctx.fillText(`E${S.charges.indexOf(c)+1}`,b.x+nx2*clen+3,b.y+ny2*clen);
+    }
+  }
+
+  const Fx=S.ball.q*Ex, Fy=S.ball.q*Ey;
+  const fm=Math.hypot(Fx,Fy);
+  const fnx=Fx/fm, fny=Fy/fm;
+  ctx.save(); ctx.shadowColor='#00ff80'; ctx.shadowBlur=8;
+  ctx.strokeStyle='#00ff80'; ctx.fillStyle='#00ff80'; ctx.lineWidth=2.5;
+  arw(b.x,b.y,b.x+fnx*lv2,b.y+fny*lv2,12,3);
+  ctx.restore();
+  ctx.fillStyle='#00ff80';
+  ctx.font=`bold ${Math.max(9,r*.7)}px Rajdhani`;
+  ctx.textAlign  = fnx>0?'left':'right';
+  ctx.textBaseline='bottom';
+  ctx.fillText('F_net',b.x+fnx*lv2+(fnx>0?5:-5),b.y+fny*lv2-3);
+}
+
+// Drawing helpers
+function arw(x1,y1,x2,y2,hl,hw){
+  const ang=Math.atan2(y2-y1,x2-x1);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hl*Math.cos(ang-hw*.5),y2-hl*Math.sin(ang-hw*.5));
+  ctx.lineTo(x2-hl*Math.cos(ang+hw*.5),y2-hl*Math.sin(ang+hw*.5));
+  ctx.closePath(); ctx.fill();
+}
+function arwCtx(c,x1,y1,x2,y2,hl,hw){
+  // Same as arw but on a provided context (for offscreen canvas)
+  const ang=Math.atan2(y2-y1,x2-x1);
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+  c.beginPath(); c.moveTo(x2,y2);
+  c.lineTo(x2-hl*Math.cos(ang-hw*.5),y2-hl*Math.sin(ang-hw*.5));
+  c.lineTo(x2-hl*Math.cos(ang+hw*.5),y2-hl*Math.sin(ang+hw*.5));
+  c.closePath(); c.fill();
+}
+function ln(x1,y1,x2,y2,col,w){
+  ctx.strokeStyle=col; ctx.lineWidth=w;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+}
+function arc2(cx,cy,r,col,w){
+  ctx.strokeStyle=col; ctx.lineWidth=w;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
+}
+function dot(cx,cy,r,col){
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  READOUT & TEACHER PANEL
+// ═══════════════════════════════════════════════════════════════════════
+
+function readout(Ex, Ey, ax, ay, Fx, Fy){
+  const fmt=v=>isNaN(v)||!isFinite(v)?'—':(Math.abs(v)<1000?v.toFixed(1):v.toExponential(2));
+  const s=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=fmt(v); };
+  // FIX: Y-axis inversion noted in UI ("sim. units (scaled)" label explains convention)
+  s('rEx',Ex); s('rEy',-Ey); s('rEm',Math.hypot(Ex,Ey));
+  s('rVx',S.ball.vx); s('rVy',-S.ball.vy); s('rVm',Math.hypot(S.ball.vx,S.ball.vy));
+  s('rAx',ax); s('rAy',-ay); s('rFx',Fx); s('rFy',-Fy);
+  // Potential at ball position (shown at band>=5)
+  const el=document.getElementById('rVpot');
+  if(el && GCFG[S.grade].band>=5) el.textContent=fmt(potentialAt(S.ball.x,S.ball.y));
+}
+
+/**
+ * FIX: Teacher panel uses pre-existing DOM nodes with textContent updates.
+ * No innerHTML rebuild every frame → no layout thrash.
+ */
+function teacherUpdate(Ex, Ey, ax, ay, det){
+  const elBall = document.getElementById('tc-ball');
+  const elCh   = document.getElementById('tc-charges');
+  const elSum  = document.getElementById('tc-sum');
+  if(!elBall) return;
+
+  elBall.textContent = `Ball: q=${S.ball.q>0?'+':'−'}${Math.abs(S.ball.q).toFixed(1)}, m=${S.ball.m.toFixed(1)}`;
+
+  // Build charge rows — only recreate DOM nodes if charge count changed
+  const want = det.length;
+  while(elCh.children.length < want){
+    const d=document.createElement('div'); d.className='tch-row'; elCh.appendChild(d);
+  }
+  while(elCh.children.length > want) elCh.removeChild(elCh.lastChild);
+  det.forEach((d,i)=>{
+    elCh.children[i].textContent =
+      `Ch.${d.i+1}: q=${d.qv>0?'+':'−'}${Math.abs(d.qv).toFixed(1)}, r=${d.r}px | |E|=${d.em} Ex=${d.ex} Ey=${d.ey}`;
+  });
+
+  elSum.textContent =
+    `Σ Ex=${Ex.toFixed(1)}  Σ Ey=${(-Ey).toFixed(1)}  Ax=${ax.toFixed(2)}  Ay=${(-ay).toFixed(2)}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  EQUATIONS / JOURNAL
+// ═══════════════════════════════════════════════════════════════════════
+function checkUnlock(id){
+  if(S.unlocked.has(id)) return;
+  const eq=EQS.find(e=>e.id===id);
+  if(!eq || GCFG[S.grade].band<eq.gMin) return;
+  S.unlocked.add(id); SND.play('unlock'); showUnlockPop(eq); renderJournal();
+  if(S.unlocked.size>=4) awardBadge('physi');
+}
+
+function showUnlockPop(eq){
+  document.getElementById('uf').textContent=eq.form;
+  document.getElementById('un').textContent=eq.name;
+  const p=document.getElementById('upop'); p.classList.add('show');
+  clearTimeout(S.upopTmr);
+  S.upopTmr=setTimeout(()=>p.classList.remove('show'),3400);
+}
+
+function renderJournal(){
+  const cont=document.getElementById('jent'); if(!cont) return;
+  let h='';
+  EQS.forEach(eq=>{
+    const lit=S.unlocked.has(eq.id);
+    h+=`<div class="eqcard ${lit?'lit':'lck'}">
+      <div class="eqf">${eq.form}</div><div class="eqn">${eq.name.toUpperCase()}</div>
+      <div class="eqe">${lit?eq.exp:'Keep playing to unlock this equation...'}</div>
+      ${!lit?`<div class="eqh">Hint: ${eq.hint}</div>`:''}
+    </div>`;
+  });
+  cont.innerHTML=h;
+}
+
+function buildEqSidebar(band){
+  const el=document.getElementById('eqlist'); if(!el) return;
+  const visible=EQS.filter(e=>e.gMin<=band).slice(0,4);
+  el.innerHTML=visible.map(e=>`<div style="color:var(--acc)">${e.form}</div><div style="color:var(--dim);font-family:'Rajdhani',sans-serif;font-size:10px;margin-bottom:4px">${e.name}</div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  BADGES
+// ═══════════════════════════════════════════════════════════════════════
+function buildBadges(){
+  const row=document.getElementById('bdgrow'); row.innerHTML='';
+  BADGES.forEach(b=>{
+    const el=document.createElement('div');
+    el.className='bdg'+(S.badgesEarned.has(b.id)?' lit':'');
+    el.textContent=b.icon; el.title=`${b.label}: ${b.desc}`;
+    row.appendChild(el);
+  });
+}
+
+function awardBadge(id){
+  if(S.badgesEarned.has(id)) return;
+  S.badgesEarned.add(id); SND.play('badge'); buildBadges();
+  const b=BADGES.find(x=>x.id===id); if(b) toast(`🏅 Badge Unlocked: ${b.label}!`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  ENTITY PANEL
+// ═══════════════════════════════════════════════════════════════════════
+function selectEntity(idx){ S.selIdx=idx; updateEntityPanel(); render(); }
+
+function updateEntityPanel(){
+  const ep=document.getElementById('ep'); if(S.selIdx===-1){ ep.style.display='none'; return; }
+  ep.style.display='block';
+  const tit   =document.getElementById('eptit');
+  const polP  =document.getElementById('polP');
+  const polN  =document.getElementById('polN');
+  const rmbtn =document.getElementById('rmbtn');
+  const slM   =document.getElementById('slM');
+  const slQ   =document.getElementById('slQ');
+  const svM   =document.getElementById('svM');
+  const svQ   =document.getElementById('svQ');
+  const polrow=document.getElementById('polrow');
+  const epMrow=document.getElementById('epMrow');
+
+  if(S.selIdx===-2){
+    // Ball selected
+    tit.textContent='⚽ Ball (Test Charge)'; tit.style.color='var(--ball)';
+    epMrow.style.display='flex';              // FIX: mass slider only shown for ball
+    slM.value=S.ball.m; svM.textContent=S.ball.m.toFixed(1);
+    slQ.value=Math.abs(S.ball.q); svQ.textContent=Math.abs(S.ball.q).toFixed(1);
+    polrow.style.display='flex';
+    polP.textContent='q⁺'; polN.textContent='q⁻';
+    polP.className=S.ball.q>0?'pbtn ra':'pbtn';
+    polN.className=S.ball.q<0?'pbtn ba':'pbtn';
+    rmbtn.style.display='none';
+  } else if(S.selIdx>=0 && S.selIdx<S.charges.length){
+    // Source charge selected
+    const c=S.charges[S.selIdx], isP=c.q>0;
+    tit.textContent=`Charge ${S.selIdx+1} (${isP?'Positive':'Negative'})`; tit.style.color=isP?'var(--red)':'var(--blue)';
+    epMrow.style.display='none';             // FIX: no mass slider for source charges
+    slQ.value=c.mag; svQ.textContent=c.mag.toFixed(1);
+    polrow.style.display='flex';
+    polP.textContent='⊕ Pos'; polN.textContent='⊖ Neg';
+    polP.className=isP?'pbtn ra':'pbtn';
+    polN.className=!isP?'pbtn ba':'pbtn';
+    rmbtn.style.display='block';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  INPUT SYSTEM
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Convert mouse/touch event to canvas coordinates */
+/** Convert event coords → logical canvas coordinates (CSS pixels, matching drawing coords). */
+function cpos(e){
+  const r   = cv.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  // r.width == logW() (CSS size), so no scaling needed — direct CSS-pixel coords
+  return { x: src.clientX - r.left, y: src.clientY - r.top };
+}
+
+cv.addEventListener('mousedown', onDown);
+cv.addEventListener('mousemove', onMove);
+cv.addEventListener('mouseup',   onUp);
+cv.addEventListener('dblclick',  onDblClick);
+cv.addEventListener('touchstart', e=>{ e.preventDefault(); onTouchStart(e); }, {passive:false});
+cv.addEventListener('touchmove',  e=>{ e.preventDefault(); onMove(e); },       {passive:false});
+cv.addEventListener('touchend',   e=>{ e.preventDefault(); onTouchEnd(e); },    {passive:false});
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+/**
+ * FIX: Touch double-tap detection with DBLTAP_MS timer.
+ * First tap starts a timer; if second tap arrives before timer fires → double-tap.
+ * Timer fires → place charge. No ghost charge on double-tap.
+ */
+function onTouchStart(e){
+  SND.init(); SND.go();
+  const p=cpos(e);
+
+  // Gauss mode: start drawing
+  if(S.gaussMode){
+    S.gaussPath=[p]; S.gaussDrawing=true;
+    document.getElementById('gaussHUD').classList.remove('vis');
+    render(); return;
+  }
+
+  const now=Date.now();
+  const dt=now-S.lastTapT;
+  const dx=p.x-S.lastTapX, dy=p.y-S.lastTapY;
+  const dist=Math.hypot(dx,dy);
+
+  if(dt < 350 && dist < 36){
+    // Second tap within window → double-tap, cancel pending place
+    clearTimeout(S.tapTimer); S.tapTimer=null;
+    S.lastTapT=0;
+    performDblTap(p);
+    return;
+  }
+
+  S.lastTapT=now; S.lastTapX=p.x; S.lastTapY=p.y;
+
+  // Check if tapping a draggable target (charge or ball)
+  const dragTarget = findDragTarget(p);
+  if(dragTarget !== null){
+    // Tapping a charge/ball — select it immediately, no delay needed
+    applyDragStart(p, dragTarget);
+    return;
+  }
+
+  // For placing a new charge: start a timer; if no second tap, place
+  // Store intent so timer closure captures it correctly
+  const intentType=S.selType, intentMag=S.selMag;
+  const intentP={x:p.x,y:p.y};
+  clearTimeout(S.tapTimer);
+  S.tapTimer=setTimeout(()=>{
+    S.tapTimer=null;
+    if(!inField(intentP.x,intentP.y)) return;
+    // v4: enforce charge limit
+    if(!canPlaceCharge()) return;
+    SND.play('place');
+    S.charges.push({x:intentP.x,y:intentP.y,q:intentType,mag:intentMag});
+    const ni=S.charges.length-1;
+    S.dragIdx=ni; S.dragOff={x:0,y:0};
+    selectEntity(ni);
+    S.fieldDirty=true;
+    updateChargeLimitHUD();
+    if(S.charges.length>=2) checkUnlock('super');
+    calcGhost(); render();
+  }, DBLTAP_MS);
+}
+
+function onTouchEnd(e){
+  onUp(e);
+}
+
+/** Find which entity (if any) a point hits for dragging. Returns null or {type,idx}. */
+function findDragTarget(p){
+  if(Math.hypot(p.x-S.ball.x,p.y-S.ball.y) < ballR()+12) return {type:'ball',idx:-2};
+  for(let i=0;i<S.charges.length;i++){
+    const c=S.charges[i];
+    if(Math.hypot(p.x-c.x,p.y-c.y) < chR(c.mag)+10) return {type:'charge',idx:i};
+  }
+  return null;
+}
+
+function applyDragStart(p, target){
+  if(target.type==='ball'){
+    S.dragBall=true; S.dragOff={x:p.x-S.ball.x,y:p.y-S.ball.y}; selectEntity(-2);
+  } else {
+    S.dragIdx=target.idx; S.dragOff={x:p.x-S.charges[target.idx].x,y:p.y-S.charges[target.idx].y};
+    selectEntity(target.idx);
+  }
+}
+
+function onDown(e){
+  SND.init(); SND.go();
+  const p=cpos(e);
+
+  // Gauss mode: start drawing surface
+  if(S.gaussMode){
+    S.gaussPath=[p]; S.gaussDrawing=true;
+    document.getElementById('gaussHUD').classList.remove('vis');
+    render(); return;
+  }
+
+  // Ball hit?
+  if(Math.hypot(p.x-S.ball.x,p.y-S.ball.y) < ballR()+12){
+    S.dragBall=true; S.dragOff={x:p.x-S.ball.x,y:p.y-S.ball.y}; selectEntity(-2); return;
+  }
+
+  // Charge hit?
+  for(let i=0;i<S.charges.length;i++){
+    const c=S.charges[i];
+    if(Math.hypot(p.x-c.x,p.y-c.y) < chR(c.mag)+10){
+      S.dragIdx=i; S.dragOff={x:p.x-c.x,y:p.y-c.y}; selectEntity(i); return;
+    }
+  }
+
+  // Empty field — place charge (mouse: immediate; touch: timer already handles it)
+  if(!inField(p.x,p.y)) return;
+  // v4: enforce charge limit
+  if(!canPlaceCharge()) return;
+  SND.play('place');
+  S.charges.push({x:p.x,y:p.y,q:S.selType,mag:S.selMag});
+  const ni=S.charges.length-1;
+  S.dragIdx=ni; S.dragOff={x:0,y:0};
+  selectEntity(ni);
+  S.fieldDirty=true;
+  updateChargeLimitHUD();
+  if(S.charges.length>=2) checkUnlock('super');
+  calcGhost(); render();
+}
+
+function onMove(e){
+  const p=cpos(e);
+
+  // Gauss mode: extend path
+  if(S.gaussMode && S.gaussDrawing){
+    const last=S.gaussPath[S.gaussPath.length-1];
+    if(Math.hypot(p.x-last.x,p.y-last.y)>6){ S.gaussPath.push(p); render(); }
+    return;
+  }
+
+  if(S.dragBall){
+    const nx=p.x-S.dragOff.x, ny=p.y-S.dragOff.y;
+    if(inField(nx,ny)){
+      S.ball.x=nx; S.ball.y=ny;
+      if(!S.running){ S.bStart={x:nx,y:ny}; }
+      if(S.running){ S.ball.vx=0; S.ball.vy=0; }
+    }
+    calcGhost(); render(); return;
+  }
+  if(S.dragIdx>=0 && S.dragIdx<S.charges.length){
+    const nx=p.x-S.dragOff.x, ny=p.y-S.dragOff.y;
+    if(inField(nx,ny)){ S.charges[S.dragIdx].x=nx; S.charges[S.dragIdx].y=ny; }
+    S.fieldDirty=true;
+    if(Math.hypot(S.charges[S.dragIdx].x-S.ball.x,S.charges[S.dragIdx].y-S.ball.y)<FW*.16)
+      checkUnlock('invsq');
+    calcGhost(); render(); return;
+  }
+
+  // v4: potential probe on hover (no drag active, mouse over field)
+  if(inField(p.x,p.y) && S.charges.length && !S.running){
+    showProbe(p.x, p.y);
+  } else {
+    hideProbe();
+  }
+}
+
+function onUp(){
+  // Gauss mode: close the surface
+  if(S.gaussMode && S.gaussDrawing){
+    S.gaussDrawing=false;
+    render(); return;
+  }
+  S.dragIdx=-1; S.dragBall=false;
+}
+
+/** Mouse double-click — remove charge under cursor */
+function onDblClick(e){
+  const p=cpos(e);
+  performDblTap(p);
+}
+
+/** Shared double-tap/double-click charge removal */
+function performDblTap(p){
+  for(let i=S.charges.length-1; i>=0; i--){
+    if(Math.hypot(p.x-S.charges[i].x,p.y-S.charges[i].y) < chR(S.charges[i].mag)+10){
+      SND.play('remove');
+      S.charges.splice(i,1);
+      S.fieldDirty=true;
+      if(S.selIdx===i) selectEntity(-1);
+      else if(S.selIdx>i) S.selIdx--;
+      calcGhost(); render(); return;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  UI HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+function showOverlay(msg,type){
+  const el=document.getElementById('ovm'); el.textContent=msg; el.className=type; el.style.opacity=1;
+}
+function hideOverlay(){ document.getElementById('ovm').style.opacity=0; }
+function toast(msg){
+  const el=document.getElementById('toast'); el.textContent=msg; el.style.opacity=1;
+  clearTimeout(S.toastTmr); S.toastTmr=setTimeout(()=>el.style.opacity=0,2600);
+}
+
+// Panel toggles (mobile)
+function setupPanelToggles(){
+  const lp=document.getElementById('lp'), rp=document.getElementById('rp');
+  const ltog=document.getElementById('lptog'), rtog=document.getElementById('rptog');
+  ltog.addEventListener('click',()=>{
+    lp.classList.toggle('collapsed');
+    ltog.querySelector('span').textContent=lp.classList.contains('collapsed')?'▶':'◀';
+    // FIX: resize after transition completes (was 250ms, transition is 220ms)
+    setTimeout(resize,240);
+  });
+  rtog.addEventListener('click',()=>{
+    rp.classList.toggle('collapsed');
+    rtog.querySelector('span').textContent=rp.classList.contains('collapsed')?'◀':'▶';
+    setTimeout(resize,240);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  CONTROL WIRING
+// ═══════════════════════════════════════════════════════════════════════
+document.getElementById('btnL').addEventListener('click', launch);
+document.getElementById('btnP').addEventListener('click', togglePause);
+document.getElementById('btnR').addEventListener('click', resetBall);
+document.getElementById('btnC').addEventListener('click', clearAll);
+document.getElementById('btnJ').addEventListener('click',()=>{ renderJournal(); document.getElementById('jov').classList.add('vis'); });
+document.getElementById('jcls').addEventListener('click',()=>document.getElementById('jov').classList.remove('vis'));
+document.getElementById('btnA').addEventListener('click',()=>document.getElementById('aov').classList.add('vis'));
+document.getElementById('acls').addEventListener('click',()=>document.getElementById('aov').classList.remove('vis'));
+// v4: Experiment panel
+document.getElementById('btnX').addEventListener('click', openExperiment);
+document.getElementById('expClose').addEventListener('click',()=>document.getElementById('expPanel').classList.remove('vis'));
+document.querySelectorAll('.exp-tab').forEach(t=>t.addEventListener('click',()=>{
+  S.expMode=t.dataset.exp;
+  document.querySelectorAll('.exp-tab').forEach(x=>x.classList.toggle('on',x===t));
+  document.getElementById('expDesc').textContent=EXP_DESCS[S.expMode]||'';
+  drawExperiment();
+}));
+document.getElementById('expQ').addEventListener('input',function(){
+  document.getElementById('expQval').textContent=parseFloat(this.value).toFixed(1);
+  drawExperiment();
+});
+// v4: hide probe when leaving canvas
+cv.addEventListener('mouseleave', hideProbe);
+
+document.getElementById('sbtn').addEventListener('click',function(){
+  SND.on=!SND.on; this.classList.toggle('on',SND.on); this.textContent=SND.on?'🔊':'🔇';
+  if(!SND.on) SND.stopHum();
+});
+
+document.getElementById('bPos').addEventListener('click',()=>{
+  S.selType=1;
+  document.getElementById('bPos').classList.add('on');
+  document.getElementById('bNeg').classList.remove('on');
+});
+document.getElementById('bNeg').addEventListener('click',()=>{
+  S.selType=-1;
+  document.getElementById('bNeg').classList.add('on');
+  document.getElementById('bPos').classList.remove('on');
+});
+
+document.querySelectorAll('.mbtn').forEach(b=>b.addEventListener('click',()=>{
+  S.selMag=parseInt(b.dataset.m);
+  document.querySelectorAll('.mbtn').forEach(x=>x.classList.toggle('on',x===b));
+}));
+
+document.querySelectorAll('.lvtab').forEach(t=>t.addEventListener('click',()=>setLevel(parseInt(t.dataset.l))));
+document.querySelectorAll('.gtab').forEach(t=>t.addEventListener('click',()=>{ SND.init(); SND.go(); setGrade(t.dataset.g); }));
+
+// Ball mass slider (only active when ball is selected)
+document.getElementById('slM').addEventListener('input',function(){
+  const v=parseFloat(this.value);
+  document.getElementById('svM').textContent=v.toFixed(1);
+  if(S.selIdx===-2){ S.ball.m=v; checkUnlock('newt2'); }
+  calcGhost(); render();
+});
+
+// Charge magnitude / ball q slider
+document.getElementById('slQ').addEventListener('input',function(){
+  const v=parseFloat(this.value);
+  document.getElementById('svQ').textContent=v.toFixed(1);
+  if(S.selIdx===-2){
+    S.ball.q = S.ball.q>0?v:-v; checkUnlock('force');
+  } else if(S.selIdx>=0&&S.selIdx<S.charges.length){
+    S.charges[S.selIdx].mag=v; S.fieldDirty=true; checkUnlock('coul');
+  }
+  calcGhost(); render();
+});
+
+document.getElementById('polP').addEventListener('click',()=>{
+  if(S.selIdx===-2) S.ball.q=Math.abs(S.ball.q);
+  else if(S.selIdx>=0){ S.charges[S.selIdx].q=1; S.fieldDirty=true; }
+  updateEntityPanel(); calcGhost(); render();
+});
+document.getElementById('polN').addEventListener('click',()=>{
+  if(S.selIdx===-2){ S.ball.q=-Math.abs(S.ball.q); checkUnlock('force'); }
+  else if(S.selIdx>=0){ S.charges[S.selIdx].q=-1; S.fieldDirty=true; }
+  updateEntityPanel(); calcGhost(); render();
+});
+document.getElementById('rmbtn').addEventListener('click',()=>{
+  if(S.selIdx>=0&&S.selIdx<S.charges.length){
+    SND.play('remove'); S.charges.splice(S.selIdx,1); S.fieldDirty=true;
+    selectEntity(-1); calcGhost(); render();
+  }
+});
+
+['tR','tN','tT','tV','tG','tC','tH','tE'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('change',()=>{
+    S.fieldDirty=true;
+    // Show/hide potential legend when heatmap toggled
+    if(id==='tH' && !el.checked) document.getElementById('potLegend').classList.remove('vis');
+    calcGhost(); render();
+  });
+});
+
+document.getElementById('gaussBtn').addEventListener('click', toggleGaussMode);
+
+// ═══════════════════════════════════════════════════════════════════════
+// ██████  INIT
+// ═══════════════════════════════════════════════════════════════════════
+window.addEventListener('load',()=>{
+  setupPanelToggles();
+  buildBadges();
+  setGrade('g910');
+  setLevel(0);
+  renderJournal();
+  // v4: initially hide experiment button (shown based on grade)
+  const xb=document.getElementById('btnX');
+  if(xb) xb.style.display='none';
+
+  // Initial render
+  resize();
+
+  // ResizeObserver: fires on ANY container size change (panel collapse, orientation, zoom)
+  const ro = new ResizeObserver(()=>{ resize(); });
+  ro.observe(document.getElementById('cw'));
+
+  // DPR change detection (browser zoom, moving between monitors)
+  function watchDPR(){
+    const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    mq.addEventListener('change', ()=>{ resize(); watchDPR(); }, { once: true });
+  }
+  watchDPR();
+
+  // v4: also trigger boost zone animation loop (zones pulse independently of game loop)
+  function boostLoop(){
+    if(S.boostZones.length && !S.running) render();
+    requestAnimationFrame(boostLoop);
+  }
+  requestAnimationFrame(boostLoop);
+});
+
+// Wake audio on first interaction
+document.addEventListener('touchstart',()=>{ SND.init(); SND.go(); },{once:true});
+document.addEventListener('mousedown', ()=>{ SND.init(); SND.go(); },{once:true});
+</script>
+</body>
+</html>
