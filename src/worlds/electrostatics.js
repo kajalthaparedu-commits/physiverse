@@ -15,7 +15,6 @@ container.style.top = "80px"
 container.style.bottom = "60px"
 container.style.left = "0"
 container.style.width = "100%"
-container.style.height = "100%"
 container.style.display = "flex"
 container.style.flexDirection = "column"
 container.style.alignItems = "center"
@@ -38,7 +37,7 @@ title.innerText = "⚡ Electrostatics Lab"
 title.style.fontSize = "42px"
 title.style.letterSpacing = "4px"
 title.style.textShadow = "0 0 14px #6ec6ff"
-title.style.marginTop = "120px"
+title.style.marginTop = "40px"
 title.style.marginBottom = "10px"
 
 container.appendChild(title)
@@ -125,8 +124,8 @@ grid.appendChild(card)
 function launchSimulation(file){
 
 container.innerHTML = ""
-/* back button */
-const header = document.getElementById("header")
+
+/* BACK BUTTON */
 
 const back = document.createElement("button")
 
@@ -140,32 +139,22 @@ back.style.background = "#111"
 back.style.border = "1px solid #6ec6ff"
 back.style.color = "white"
 back.style.cursor = "pointer"
+back.style.zIndex = "100"
 
 back.onclick = ()=>{
-
 container.remove()
-back.remove()
 createWorld(scene,camera)
-
 }
 
-header.appendChild(back)  
+container.appendChild(back)
+
+
 /* ----------------------------- */
-/* DYNAMIC HEADER / FOOTER SIZE */
+/* HEADER / FOOTER OFFSET */
 /* ----------------------------- */
 
 const header = document.getElementById("header")
 const footer = document.getElementById("physiverseFooter")
-
-function computeOffsets(){
-
-const headerHeight = header ? header.offsetHeight : 0
-const footerHeight = footer ? footer.offsetHeight : 0
-
-wrapper.style.top = headerHeight + "px"
-wrapper.style.bottom = footerHeight + "px"
-
-}
 
 
 /* ----------------------------- */
@@ -182,8 +171,18 @@ wrapper.style.overflow = "hidden"
 
 container.appendChild(wrapper)
 
-computeOffsets()
 
+function computeOffsets(){
+
+const headerHeight = header ? header.offsetHeight : 0
+const footerHeight = footer ? footer.offsetHeight : 0
+
+wrapper.style.top = headerHeight + "px"
+wrapper.style.bottom = footerHeight + "px"
+
+}
+
+computeOffsets()
 window.addEventListener("resize", computeOffsets)
 
 
@@ -215,7 +214,7 @@ container.appendChild(rotateMsg)
 
 const frame = document.createElement("iframe")
 
-frame.src = "simulations/" + file
+frame.src = "./simulations/" + file
 frame.style.width = "100%"
 frame.style.height = "100%"
 frame.style.border = "none"
