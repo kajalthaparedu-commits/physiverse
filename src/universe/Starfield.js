@@ -7,12 +7,20 @@ constructor(scene){
 this.scene = scene
 this.layers = []
 this.time = 0
+this.mouse = { x:0, y:0 }
 
-/* depth layers */
+window.addEventListener("mousemove", e => {
 
-this.createLayer(1200,0.7,-500)
-this.createLayer(900,1.1,-900)
-this.createLayer(600,1.6,-1400)
+this.mouse.x = (e.clientX / window.innerWidth) - 0.5
+this.mouse.y = (e.clientY / window.innerHeight) - 0.5
+
+})
+
+  /* depth layers */
+
+this.createLayer(3000,0.9,-500)
+this.createLayer(2000,1.3,-900)
+this.createLayer(1200,1.8,-1400)
 
 }
 
@@ -30,8 +38,8 @@ const positions = []
 for(let i=0;i<count;i++){
 
 positions.push(
-(Math.random()-0.5)*4000,
-(Math.random()-0.5)*2000,
+(Math.random()-0.5)*2500,
+(Math.random()-0.5)*1400,
 z + Math.random()*200
 )
 
@@ -46,7 +54,7 @@ const material = new THREE.PointsMaterial({
 color:0xffffff,
 size:size,
 transparent:true,
-opacity:0.9,
+opacity:1,
 depthWrite:false
 })
 
@@ -79,6 +87,10 @@ this.layers.forEach(layer=>{
 layer.mesh.rotation.y += layer.speed * 0.0001
 layer.mesh.rotation.x += layer.speed * 0.00005
 
+/* parallax movement */
+
+layer.mesh.position.x = this.mouse.x * 40 * layer.speed
+layer.mesh.position.y = this.mouse.y * 20 * layer.speed
 /* twinkle effect */
 
 layer.material.opacity =
