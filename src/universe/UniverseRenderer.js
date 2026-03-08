@@ -60,13 +60,13 @@ roughness:0.5
 
 this.electroPlanet = new THREE.Mesh(geo,mat)
 
-this.electroPlanet.position.set(0,0,-120)
+this.electroPlanet.position.set(0,0,-80)
 
 this.scene.add(this.electroPlanet)
 
   /* glow */
 
-const glowGeo = new THREE.SphereGeometry(9,32,32)
+const glowGeo = new THREE.SphereGeometry(8.8,32,32)
 
 const glowMat = new THREE.MeshBasicMaterial({
 color:0x66ccff,
@@ -75,16 +75,10 @@ opacity:0.35,
 depthWrite:false
 })
 
-const glow = new THREE.Mesh(glowGeo,glowMat)
-
-/* make glow slightly larger than planet */
-glow.scale.set(1.2,1.2,1.2)
+const glow = new THREE.Mesh(glowGeo, glowMat)
 
 this.electroPlanet.add(glow)
 
-const glow = new THREE.Mesh(glowGeo,glowMat)
-
-this.electroPlanet.add(glow)
 /* click detection */
 
 this.raycaster = new THREE.Raycaster()
@@ -97,8 +91,7 @@ this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
 
 this.raycaster.setFromCamera(this.mouse,this.camera)
 
-const hit = this.raycaster.intersectObjects([this.electroPlanet], true)
-
+const hit = this.raycaster.intersectObject(this.electroPlanet)
 if(hit.length > 0){
 
 window.loadWorld("electrostatics")
@@ -130,7 +123,7 @@ const t = Date.now() * 0.0001
 this.camera.position.x = Math.sin(t) * 20
 this.camera.position.y = Math.cos(t) * 10
 
-this.camera.lookAt(0,0,-120)
+this.camera.lookAt(0,0,-80)
 
 /* update systems */
 
