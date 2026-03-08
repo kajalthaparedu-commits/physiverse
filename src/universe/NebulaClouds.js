@@ -38,7 +38,7 @@ scene.add(sprite)
 
 this.nebulas.push({
 mesh:sprite,
-speed:0.05 + Math.random()*0.05
+speed:0.05 + Math.random()*0.15
 })
 
 }
