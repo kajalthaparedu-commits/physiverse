@@ -8,6 +8,7 @@ export function createWorld(scene, camera){
 /* ----------------------------- */
 
 const container = document.createElement("div")
+container.id = "labContainer"
 
 container.style.position = "absolute"
 container.style.top = "0"
