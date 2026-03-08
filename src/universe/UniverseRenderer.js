@@ -78,3 +78,5 @@ if(this.nebula) this.nebula.update()
 this.renderer.render(this.scene,this.camera)
 
 }
+  
+}
