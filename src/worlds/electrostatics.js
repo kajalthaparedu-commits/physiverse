@@ -214,7 +214,7 @@ container.appendChild(rotateMsg)
 
 const frame = document.createElement("iframe")
 
-frame.src = "./simulations/" + file
+frame.src = "simulations/" + file
 frame.style.width = "100%"
 frame.style.height = "100%"
 frame.style.border = "none"
