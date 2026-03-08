@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="utf-8">
+<title>Physiverse</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+
+/* ---------- BASE ---------- */
+
+html,body{
+margin:0;
+padding:0;
+width:100%;
+height:100%;
+overflow:hidden;
+background:black;
+font-family:'Inter',sans-serif;
+color:white;
+}
+
+/* ---------- THREEJS CANVAS ---------- */
+
+canvas{
+position:absolute;
+top:0;
+left:0;
+z-index:0;
+}
+
+/* ---------- GLOBAL UI LAYER ---------- */
+
+#ui{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+z-index:10;
+pointer-events:none;
+}
+
+/* allow interaction for panels */
+
+.ui-panel{
+pointer-events:auto;
+}
+
+/* ---------- TITLE SCREEN ---------- */
+
+#titleScreen{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+text-align:center;
+cursor:pointer;
+z-index:2;
+}
+
+#title{
+font-size:72px;
+letter-spacing:12px;
+font-weight:600;
+text-shadow:0 0 25px rgba(120,200,255,0.9);
+animation:titleGlow 6s ease-in-out infinite alternate;
+}
+
+@keyframes titleGlow{
+from{ text-shadow:0 0 20px rgba(120,200,255,0.6); }
+to{ text-shadow:0 0 35px rgba(120,200,255,1); }
+}
+
+#subtitle{
+margin-top:15px;
+font-size:20px;
+opacity:0.85;
+}
+
+#startText{
+margin-top:35px;
+font-size:18px;
+animation:blink 2s infinite;
+}
+
+@keyframes blink{
+0%{opacity:1}
+50%{opacity:0.3}
+100%{opacity:1}
+}
+
+/* ---------- ORBIT DECORATION ---------- */
+
+#titleContainer{
+position:relative;
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
+#orbitRing{
+position:absolute;
+width:520px;
+height:520px;
+border:1px solid rgba(120,200,255,0.25);
+border-radius:50%;
+box-shadow:0 0 40px rgba(120,200,255,0.15);
+animation:orbitSpin 80s linear infinite;
+}
+
+@keyframes orbitSpin{
+from{transform:rotate(0deg)}
+to{transform:rotate(360deg)}
+}
+
+#satellite{
+position:absolute;
+width:8px;
+height:8px;
+background:#6ec6ff;
+border-radius:50%;
+box-shadow:0 0 12px #6ec6ff;
+animation:orbitSatellite 12s linear infinite;
+}
+
+@keyframes orbitSatellite{
+0%{ transform:rotate(0deg) translateX(260px) rotate(0deg); }
+100%{ transform:rotate(360deg) translateX(260px) rotate(-360deg); }
+}
+
+/* ---------- HEADER ---------- */
+
+#header{
+position:absolute;
+top:25px;
+width:100%;
+text-align:center;
+display:none;
+}
+
+#headerTitle{
+font-size:28px;
+letter-spacing:6px;
+text-shadow:0 0 10px rgba(120,200,255,0.9);
+animation: headerPulse 6s ease-in-out infinite;
+@keyframes headerPulse{
+
+0%{
+text-shadow:0 0 8px rgba(120,200,255,0.7);
+}
+
+50%{
+text-shadow:0 0 16px rgba(120,200,255,1);
+}
+
+100%{
+text-shadow:0 0 8px rgba(120,200,255,0.7);
+}
+
+}
+}
+
+/* ---------- WORLD HUB ---------- */
+
+#worldHub{
+position:absolute;
+top:55%;
+left:50%;
+transform:translate(-50%,-50%);
+display:none;
+width:85%;
+max-width:900px;
+opacity:0;
+transition:opacity 1.5s ease;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+gap:18px;
+}
+
+.world{
+background:rgba(0,0,0,0.55);
+border:1px solid rgba(120,200,255,0.35);
+padding:20px;
+font-size:18px;
+border-radius:10px;
+cursor:pointer;
+transition:all 0.25s;
+text-align:center;
+}
+
+.world:hover{
+transform:translateY(-4px);
+border:1px solid #6ec6ff;
+box-shadow:0 0 15px rgba(120,200,255,0.6);
+}
+
+/* ---------- FOOTER ---------- */
+
+#physiverseFooter{
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+text-align:center;
+font-size:14px;
+letter-spacing:0.5px;
+color:white;
+opacity:0.85;
+padding:12px 0;
+background:rgba(0,0,0,0.35);
+backdrop-filter:blur(4px);
+z-index:9999;
+pointer-events:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- THREEJS UNIVERSE WILL INSERT CANVAS HERE -->
+
+<!-- GLOBAL UI LAYER -->
+
+<div id="ui">
+
+<!-- TITLE SCREEN -->
+
+<div id="titleScreen" class="ui-panel">
+
+<div id="titleContainer">
+<div id="orbitRing"></div>
+<div id="satellite"></div>
+<div id="title">PHYSIVERSE</div>
+</div>
+
+<div id="subtitle">
+Explore the laws of nature through interactive simulations
+</div>
+
+<div id="startText">Click anywhere to begin</div>
+
+</div>
+
+<!-- HEADER -->
+
+<div id="header" class="ui-panel">
+<div id="headerTitle">PHYSIVERSE</div>
+</div>
+
+<!-- WORLD HUB -->
+
+<div id="worldHub" class="ui-panel">
+
+<div class="grid">
+
+<div class="world" onclick="loadWorld('electrostatics')">Electrostatics</div>
+<div class="world" onclick="loadWorld('kinematics')">Kinematics</div>
+<div class="world" onclick="loadWorld('optics')">Optics</div>
+<div class="world" onclick="loadWorld('waves')">Waves</div>
+<div class="world" onclick="loadWorld('sound')">Sound</div>
+<div class="world" onclick="loadWorld('fluids')">Fluids</div>
+<div class="world" onclick="loadWorld('currentElectricity')">Current Electricity</div>
+<div class="world" onclick="loadWorld('electromagneticInduction')">Electromagnetic Induction</div>
+<div class="world" onclick="loadWorld('acCircuits')">AC Circuits</div>
+<div class="world" onclick="loadWorld('thermodynamics')">Thermodynamics</div>
+<div class="world" onclick="loadWorld('atomicPhysics')">Atomic Physics</div>
+<div class="world" onclick="loadWorld('nuclearPhysics')">Nuclear Physics</div>
+<div class="world" onclick="loadWorld('electronics')">Electronics</div>
+
+</div>
+
+</div>
+
+<!-- FOOTER -->
+
+<div id="physiverseFooter">
+© 2026 <strong>Physiverse</strong> — Conceptualised and created by 
+<strong><span style="color:#7ecbff">Kajal Thapar</span></strong><br>
+Developed with AI-assisted engineering tools
+</div>
+
+</div>
+
+<script>
+
+/* ---------- MUSIC ---------- */
+
+const music = new Audio("./assets/sound/physiverse-theme.mp3")
+music.loop = true
+music.volume = 0
+
+titleScreen.onclick = () => {
+
+music.play()
+
+let fade = setInterval(()=>{
+
+if(music.volume < 0.05){
+music.volume += 0.002
+}else{
+clearInterval(fade)
+}
+
+},120)
+
+titleScreen.style.opacity = 0
+
+setTimeout(()=>{
+
+titleScreen.style.display="none"
+
+header.style.display="block"
+
+worldHub.style.display="block"
+
+setTimeout(()=>{
+worldHub.style.opacity=1
+},50)
+
+},900)
+
+}
+
+</script>
+
+<script type="module" src="./src/main.js"></script>
+
+</body>
+</html>
