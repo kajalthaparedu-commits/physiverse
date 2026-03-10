@@ -1,4 +1,4 @@
-# Physiverse
+#PhysiForge
 
 Interactive physics simulations for learning.
 
