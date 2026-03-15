@@ -1630,7 +1630,7 @@ function loop(ts){
 function render(){
   // Guard: skip render if bounds not yet initialized (FW/FH===0 or canvas not ready)
   if(FW <= 0 || FH <= 0 || logW() <= 0 || logH() <= 0) return;
-  ctx.clearRect(0,0,logW(),logH());
+  ctx.clearRect(0,0,cv.width/DPR,cv.height/DPR);
   drawField();
   // v4: draw boost zones underneath everything
   drawBoostZones();
