@@ -39,10 +39,19 @@
 }
 html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'Rajdhani',sans-serif;overflow:hidden;user-select:none;font-size:13px;touch-action:none}
 /* Layout reset to remove browser default gaps and ensure full-viewport canvas */
-html,body{margin:0;padding:0;width:100%;height:100%;}
-#app{min-height:100vh;}
+html,body{
+margin:0;
+padding:0;
+width:100%;
+height:100%;
+}
 
-#app{display:flex;flex-direction:column;height:100vh}
+#app{
+display:flex;
+flex-direction:column;
+height:100vh;
+min-height:100vh;
+}
 
 /* ═══ PORTRAIT BLOCKER ═══ */
 #rotmsg{
@@ -60,7 +69,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;}
 @media (orientation:portrait){#rotmsg{display:flex}#app{display:none}}
 
 /* ═══ HEADER ═══ */
-#hdr{height:46px;min-height:46px;background:linear-gradient(90deg,#08101e,#0b1626);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 10px;gap:7px;flex-shrink:0;overflow:hidden}
+#hdr{height:36px;min-height:36px;background:linear-gradient(90deg,#08101e,#0b1626);border-bottom:1px solid var(--brd);display:flex;align-items:center;padding:0 10px;gap:7px;flex-shrink:0;overflow:hidden}
 .logo{font-family:'Orbitron',monospace;font-weight:900;font-size:13px;background:linear-gradient(120deg,#00e5aa,#4da6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;white-space:nowrap}
 .gtabs{display:flex;gap:2px;background:var(--p2);border:1px solid var(--brd);border-radius:4px;padding:2px;flex-shrink:0}
 .gtab{font-family:'Orbitron',monospace;font-size:7px;font-weight:700;padding:3px 6px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-radius:2px;transition:all .15s;white-space:nowrap}
