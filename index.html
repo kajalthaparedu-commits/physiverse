@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
 
 <meta charset="utf-8">
@@ -9,7 +8,155 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
 <style>
-/* (your entire CSS unchanged — keep as is) */
+
+/* BASE */
+html,body{
+margin:0;
+padding:0;
+width:100vw;
+height:100vh;
+overflow:hidden;
+background:black;
+font-family:'Inter',sans-serif;
+color:white;
+}
+
+/* CANVAS */
+canvas{
+position:fixed;
+top:0;
+left:0;
+width:100vw;
+height:100vh;
+z-index:0;
+}
+
+/* UI LAYER */
+#ui{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+z-index:10;
+pointer-events:none;
+}
+
+.ui-panel{
+pointer-events:auto;
+}
+
+/* TITLE SCREEN */
+#titleScreen{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+text-align:center;
+cursor:pointer;
+z-index:2;
+transition:opacity 0.8s ease;
+}
+
+#title{
+font-size:clamp(42px,6vw,72px);
+letter-spacing:12px;
+font-weight:600;
+text-shadow:0 0 25px rgba(120,200,255,0.9);
+}
+
+#subtitle{
+margin-top:15px;
+font-size:18px;
+opacity:0.85;
+}
+
+#startText{
+margin-top:35px;
+font-size:18px;
+animation:blink 2s infinite;
+}
+
+@keyframes blink{
+0%{opacity:1}
+50%{opacity:0.3}
+100%{opacity:1}
+}
+
+/* HEADER */
+#header{
+position:absolute;
+top:6px;
+left:0;
+width:100%;
+display:none;
+pointer-events:auto;
+text-align:center;
+}
+
+#headerTitle{
+font-size:22px;
+letter-spacing:4px;
+text-shadow:0 0 10px rgba(120,200,255,0.9);
+}
+
+/* WORLD HUB */
+#worldHub{
+position:absolute;
+top:55%;
+left:50%;
+transform:translate(-50%,-50%);
+display:none;
+width:85%;
+max-width:900px;
+opacity:0;
+transition:opacity 1s ease;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+gap:18px;
+}
+
+.world{
+background:rgba(0,0,0,0.55);
+border:1px solid rgba(120,200,255,0.35);
+padding:20px;
+font-size:18px;
+border-radius:10px;
+cursor:pointer;
+transition:all 0.25s;
+text-align:center;
+}
+
+.world:hover{
+transform:translateY(-4px);
+border:1px solid #6ec6ff;
+box-shadow:0 0 15px rgba(120,200,255,0.6);
+}
+
+/* FOOTER */
+#PhysiForgeFooter{
+position:fixed;
+bottom:0;
+left:0;
+width:100%;
+text-align:center;
+font-size:12px;
+color:white;
+opacity:0.8;
+padding:6px 0;
+background:rgba(0,0,0,0.25);
+z-index:9999;
+pointer-events:none;
+}
+
 </style>
 
 </head>
@@ -17,22 +164,12 @@
 <body>
 
 <div id="ui">
-  
-<!-- TITLE SCREEN -->
-<div id="titleScreen" class="ui-panel" role="button">
 
-<div id="titleContainer">
-<div id="orbitRing"></div>
-<div id="satellite"></div>
+<!-- TITLE -->
+<div id="titleScreen" class="ui-panel">
 <div id="title">PHYSIFORGE</div>
-</div>
-
-<div id="subtitle">
-An open platform for interactive physics exploration
-</div>
-
+<div id="subtitle">An open platform for interactive physics exploration</div>
 <div id="startText">Click anywhere to begin</div>
-
 </div>
 
 <!-- HEADER -->
@@ -55,25 +192,17 @@ An open platform for interactive physics exploration
 <!-- FOOTER -->
 <div id="PhysiForgeFooter">
 © 2026 <strong>PhysiForge</strong><br>
-Conceptualised and created by 
-<strong><span style="color:#7ecbff">Kajal Thapar</span></strong><br>
-Developed with AI-assisted tools
+Created by <span style="color:#7ecbff">Kajal Thapar</span>
 </div>
 
 </div>
 
 <script>
-
-/* TITLE CLICK LOGIC (unchanged) */
-
-const music = new Audio("./assets/sound/PhysiForge-theme.mp3")
 const titleScreen = document.getElementById("titleScreen")
 const header = document.getElementById("header")
 const worldHub = document.getElementById("worldHub")
 
 titleScreen.onclick = () => {
-
-music.play().catch(()=>{})
 
 titleScreen.style.opacity = 0
 
@@ -81,14 +210,17 @@ setTimeout(() => {
 titleScreen.style.display = "none"
 header.style.display = "block"
 worldHub.style.display = "block"
-setTimeout(()=> worldHub.style.opacity = 1, 50)
-}, 900)
+
+setTimeout(() => {
+worldHub.style.opacity = 1
+}, 50)
+
+}, 800)
 
 }
-
 </script>
 
-<!-- IMPORTANT: only main.js handles loadWorld -->
+<!-- IMPORTANT: only ONE loadWorld (in main.js) -->
 <script type="module" src="./src/main.js"></script>
 
 </body>
