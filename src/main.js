@@ -93,18 +93,23 @@ back.style.border = "1px solid #6ec6ff"
 back.style.color = "white"
 back.style.cursor = "pointer"
 
-back.onclick = ()=>{
+back.onclick = () => {
 
-wrap.remove()
+  // remove simulation
+  simWrap.remove()
+  back.remove()
 
-document.getElementById("worldHub").style.display = "block"
-document.getElementById("worldHub").style.opacity = "1"
+  // remove modern world completely
+  const modern = document.getElementById("modernWorld")
+  if(modern) modern.remove()
 
-universe.renderer.domElement.style.display = "block"
+  // show world hub again
+  const hub = document.getElementById("worldHub")
+  hub.style.display = "block"
+  hub.style.opacity = "1"
 
-}
-
-ui.appendChild(back)
+  // show universe
+  universe.renderer.domElement.style.display = "block"
 
 }
 
@@ -130,7 +135,7 @@ simWrap.style.position = "absolute"
 simWrap.style.top = "80px"
 simWrap.style.left = "0"
 simWrap.style.right = "0"
-simWrap.style.bottom = "120px"
+simWrap.style.bottom = "40px"
 simWrap.style.pointerEvents = "auto"
 
 ui.appendChild(simWrap)
