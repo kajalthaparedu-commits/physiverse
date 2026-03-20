@@ -2,77 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PhysiForge – Photoelectric Effect</title>
+<title>Photoelectric Effect</title>
 
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <style>
-body {
-  margin: 0;
-  background: #020a12;
-  color: white;
-  font-family: monospace;
+body{
+margin:0;
+background:#020a12;
+color:white;
+font-family:monospace;
 }
-button {
-  cursor: pointer;
-}
-.panel {
-  background: #030d16;
-  border: 1px solid #0d2535;
-  border-radius: 8px;
-  padding: 10px;
+.panel{
+background:#030d16;
+border:1px solid #0d2535;
+border-radius:8px;
+padding:10px;
+margin-bottom:10px;
 }
 </style>
 </head>
 
 <body>
+
 <div id="root"></div>
 
 <script type="text/babel">
 
-const { useState, useEffect, useRef, useMemo } = React;
+const {useState,useEffect,useMemo} = React;
 
-// ================= PHYSICS =================
-const h = 4.136e-3; // eV·THz
+const h = 4.136e-3;
 
 const METALS = {
-  sodium: { phi: 2.28 },
-  zinc: { phi: 4.3 },
+  sodium:{phi:2.28},
+  zinc:{phi:4.3}
 };
 
-function physics(f, I, V, metal){
+function physics(f,metal){
   const phi = METALS[metal].phi;
-  const E = h * f;
-  const emitting = E >= phi;
-  const KE = emitting ? E - phi : 0;
-  return { emitting, KE, phi, E };
+  const E = h*f;
+  const emitting = E>=phi;
+  const KE = emitting?E-phi:0;
+  return {E,phi,KE,emitting};
 }
 
-// ================= ELECTRONS =================
-function useElectrons(emitting, KE, V, onHit){
-  const [els, setEls] = useState([]);
+function useElectrons(emitting,KE,V,onHit){
+  const [els,setEls]=useState([]);
 
   useEffect(()=>{
     let raf;
 
-    const loop = ()=>{
-      raf = requestAnimationFrame(loop);
+    const loop=()=>{
+      raf=requestAnimationFrame(loop);
 
       setEls(prev=>{
-        let hits = 0;
+        let hits=0;
 
-        let next = prev.map(e=>{
-          const vx = e.vx + V*0.02;
-          const x = e.x + vx;
+        let next=prev.map(e=>{
+          const vx=e.vx+V*0.02;
+          const x=e.x+vx;
 
-          if(x > 350 && vx > 0){
+          if(x>350 && vx>0){
             hits++;
             return null;
           }
 
-          return {...e, x, vx, life:e.life-1};
+          return {...e,x,vx,life:e.life-1};
         }).filter(e=>e && e.life>0);
 
         if(hits>0) onHit(hits);
@@ -86,18 +83,17 @@ function useElectrons(emitting, KE, V, onHit){
           });
         }
 
-        return next;
+        return next.slice(-60);
       });
     };
 
-    raf = requestAnimationFrame(loop);
+    raf=requestAnimationFrame(loop);
     return ()=>cancelAnimationFrame(raf);
-  },[emitting, KE, V]);
+  },[emitting,KE,V]);
 
   return els;
 }
 
-// ================= MAIN =================
 function App(){
 
   const [f,setF]=useState(600);
@@ -108,37 +104,30 @@ function App(){
   const [hits,setHits]=useState([]);
   const [step,setStep]=useState(0);
 
-  const phys = physics(f,I,V,metal);
+  const phys=physics(f,metal);
 
-  const onHit = (n)=>{
-    const now = performance.now();
-    setHits(prev => [...prev.filter(t=>now-t<500), ...Array(n).fill(now)]);
+  const onHit=(n)=>{
+    const now=performance.now();
+    setHits(prev=>[
+      ...prev.filter(t=>now-t<500),
+      ...Array(n).fill(now)
+    ]);
   };
 
-  const current = useMemo(()=>{
+  const current=useMemo(()=>{
     return (hits.length/0.5)*0.1;
   },[hits]);
 
-  const electrons = useElectrons(phys.emitting, phys.KE, V, onHit);
+  const electrons=useElectrons(phys.emitting,phys.KE,V,onHit);
 
-  // ================= LEARNING STEPS =================
-  const steps = [
-    {
-      text:"Increase frequency until electrons start emitting",
-      done: phys.emitting
-    },
-    {
-      text:"Increase intensity → current should increase",
-      done: current > 2
-    },
-    {
-      text:"Apply negative voltage → stop current",
-      done: current === 0 && V < 0
-    }
+  const steps=[
+    {text:"Increase frequency until emission",done:phys.emitting},
+    {text:"Increase intensity → current increases",done:current>2},
+    {text:"Apply negative voltage → stop current",done:current===0 && V<0}
   ];
 
   useEffect(()=>{
-    if(step < steps.length && steps[step].done){
+    if(step<steps.length && steps[step].done){
       setStep(step+1);
     }
   },[phys,current,V]);
@@ -146,12 +135,10 @@ function App(){
   return(
     <div style={{padding:20}}>
 
-      <h2 style={{color:"#00e5ff"}}>PHYSIFORGE – MODERN PHYSICS</h2>
-      <h3>Photoelectric Effect Lab</h3>
+      <h2 style={{color:"#00e5ff"}}>PHOTOELECTRIC EFFECT</h2>
 
-      {/* TASK PANEL */}
-      <div className="panel" style={{marginBottom:15}}>
-        <b>Experiment Tasks</b>
+      <div className="panel">
+        <b>Tasks</b>
         {steps.map((s,i)=>(
           <div key={i} style={{color:i<step?"#00ff88":"#888"}}>
             {i<step?"✔":"⬜"} {s.text}
@@ -159,7 +146,6 @@ function App(){
         ))}
       </div>
 
-      {/* CONTROLS */}
       <div className="panel">
         Frequency: {f}
         <input type="range" min="400" max="800" value={f} onChange={e=>setF(+e.target.value)}/>
@@ -171,32 +157,20 @@ function App(){
         <input type="range" min="-5" max="5" step="0.1" value={V} onChange={e=>setV(+e.target.value)}/>
       </div>
 
-      {/* APPARATUS */}
-      <svg width="500" height="200" style={{marginTop:20}}>
+      <svg width="500" height="200">
         <rect x="150" y="50" width="10" height="100" fill="yellow"/>
         <rect x="350" y="50" width="10" height="100" fill="cyan"/>
-
         {electrons.map((e,i)=>(
           <circle key={i} cx={e.x} cy={e.y} r="3" fill="cyan"/>
         ))}
       </svg>
 
-      {/* READOUT */}
-      <div className="panel" style={{marginTop:15}}>
+      <div className="panel">
         Energy: {phys.E.toFixed(2)} eV<br/>
         Work Function: {phys.phi} eV<br/>
         KE: {phys.KE.toFixed(2)} eV<br/>
-        <span style={{color: current>0?"#00ff88":"#555"}}>
-          Current: {current.toFixed(2)} μA
-        </span>
+        Current: {current.toFixed(2)} μA
       </div>
-
-      {/* COMPLETION */}
-      {step===steps.length && (
-        <div style={{marginTop:15,color:"#00ff88"}}>
-          🎉 Experiment Complete!
-        </div>
-      )}
 
     </div>
   );
@@ -205,5 +179,6 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 
 </script>
+
 </body>
 </html>
