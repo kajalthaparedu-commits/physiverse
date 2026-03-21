@@ -31,7 +31,7 @@ height:100vh;
 z-index:0;
 }
 
-/* UI LAYER */
+/* UI */
 #ui{
 position:absolute;
 top:0;
@@ -61,6 +61,44 @@ text-align:center;
 cursor:pointer;
 z-index:2;
 transition:opacity 0.8s ease;
+}
+
+/* TITLE ORBIT */
+#titleContainer{
+position:relative;
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
+#orbitRing{
+position:absolute;
+width:min(520px,70vw);
+height:min(520px,70vw);
+border:1px solid rgba(120,200,255,0.25);
+border-radius:50%;
+box-shadow:0 0 40px rgba(120,200,255,0.15);
+animation:spin 80s linear infinite;
+}
+
+#satellite{
+position:absolute;
+width:8px;
+height:8px;
+background:#6ec6ff;
+border-radius:50%;
+box-shadow:0 0 12px #6ec6ff;
+animation:orbit 12s linear infinite;
+}
+
+@keyframes spin{
+from{transform:rotate(0deg)}
+to{transform:rotate(360deg)}
+}
+
+@keyframes orbit{
+0%{ transform:rotate(0deg) translateX(260px) rotate(0deg); }
+100%{ transform:rotate(360deg) translateX(260px) rotate(-360deg); }
 }
 
 #title{
@@ -95,7 +133,6 @@ top:6px;
 left:0;
 width:100%;
 display:none;
-pointer-events:auto;
 text-align:center;
 }
 
@@ -120,25 +157,26 @@ transition:opacity 1s ease;
 
 .grid{
 display:grid;
-grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-gap:18px;
+grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+gap:20px;
 }
 
 .world{
 background:rgba(0,0,0,0.55);
 border:1px solid rgba(120,200,255,0.35);
-padding:20px;
+padding:22px;
 font-size:18px;
-border-radius:10px;
+border-radius:12px;
 cursor:pointer;
 transition:all 0.25s;
 text-align:center;
+letter-spacing:1px;
 }
 
 .world:hover{
-transform:translateY(-4px);
+transform:translateY(-5px);
 border:1px solid #6ec6ff;
-box-shadow:0 0 15px rgba(120,200,255,0.6);
+box-shadow:0 0 20px rgba(120,200,255,0.6);
 }
 
 /* FOOTER */
@@ -148,13 +186,10 @@ bottom:0;
 left:0;
 width:100%;
 text-align:center;
-font-size:11px;
-color:white;
-opacity:0.7;
-padding:4px 0;
-background:rgba(0,0,0,0.2);
-z-index:5;
-pointer-events:none;
+font-size:10px;
+opacity:0.6;
+padding:3px 0;
+background:rgba(0,0,0,0.15);
 }
 
 </style>
@@ -167,9 +202,19 @@ pointer-events:none;
 
 <!-- TITLE -->
 <div id="titleScreen" class="ui-panel">
+
+<div id="titleContainer">
+<div id="orbitRing"></div>
+<div id="satellite"></div>
 <div id="title">PHYSIFORGE</div>
-<div id="subtitle">An open platform for interactive physics exploration</div>
+</div>
+
+<div id="subtitle">
+An open platform for interactive physics exploration
+</div>
+
 <div id="startText">Click anywhere to begin</div>
+
 </div>
 
 <!-- HEADER -->
@@ -196,8 +241,7 @@ pointer-events:none;
 
 <!-- FOOTER -->
 <div id="PhysiForgeFooter">
-© 2026 <strong>PhysiForge</strong><br>
-Created by <span style="color:#7ecbff">Kajal Thapar</span>
+© 2026 <strong>PhysiForge</strong> · Created by <span style="color:#7ecbff">Kajal Thapar</span>
 </div>
 
 </div>
@@ -232,8 +276,6 @@ function openWorldPage(world){
 }
 
 </script>
-
-<script type="module" src="./src/main.js"></script>
 
 </body>
 </html>
