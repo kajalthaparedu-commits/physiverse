@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Electrostatics – PhysiForge</title>
+
+<style>
+body{
+  margin:0;
+  background:radial-gradient(circle at center,#0a0012 0%,#050008 100%);
+  color:white;
+  font-family:'Inter',sans-serif;
+}
+
+/* HEADER */
+.header{
+  text-align:center;
+  padding:20px;
+  font-size:22px;
+  letter-spacing:4px;
+  color:#ff77ff;
+  text-shadow:0 0 20px #ff77ff;
+}
+
+/* GRID */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:22px;
+  padding:40px;
+  max-width:1100px;
+  margin:auto;
+}
+
+/* CARD */
+.card{
+  padding:25px;
+  border-radius:14px;
+  background:rgba(0,0,0,0.5);
+  border:1px solid rgba(255,120,255,0.2);
+  cursor:pointer;
+  transition:all 0.35s ease;
+}
+
+.card:hover{
+  transform:translateY(-8px) scale(1.02);
+  border:1px solid #ff77ff;
+  box-shadow:0 0 30px #ff77ff55;
+}
+
+/* TEXT */
+.title{
+  font-size:18px;
+  color:#ff77ff;
+  margin-bottom:10px;
+}
+
+.desc{
+  font-size:13px;
+  color:#c38ac3;
+}
+
+/* BACK BUTTON */
+.back{
+  position:absolute;
+  top:20px;
+  left:20px;
+  padding:10px 16px;
+  background:#000;
+  border:1px solid #ff77ff;
+  color:#ff77ff;
+  cursor:pointer;
+  border-radius:6px;
+}
+
+.back:hover{
+  box-shadow:0 0 12px #ff77ff;
+}
+
+/* FOOTER */
+.footer{
+  position:fixed;
+  bottom:10px;
+  width:100%;
+  text-align:center;
+  font-size:11px;
+  color:#c38ac3;
+}
+</style>
+</head>
+
+<body>
+
+<button class="back" onclick="goBack()">← Back</button>
+
+<div class="header">ELECTROSTATICS WORLD</div>
+
+<div class="grid">
+
+<div class="card" onclick="openSim('electric-field-football.html')">
+  <div class="title">⚡ Electric Field Football</div>
+  <div class="desc">Visualize fields via gameplay</div>
+</div>
+
+<div class="card">
+  <div class="title">🔥 Potential Heatmap</div>
+  <div class="desc">Visual potential distributions</div>
+</div>
+
+<div class="card">
+  <div class="title">📐 Gauss Law</div>
+  <div class="desc">Flux and symmetry</div>
+</div>
+
+</div>
+
+<div class="footer">
+© PhysiForge · Created by Kajal Thapar
+</div>
+
+<script>
+function openSim(file){
+  window.location.href = "../simulations/" + file
+}
+
+function goBack(){
+  window.location.href = "../index.html"
+}
+</script>
+
+</body>
+</html>
