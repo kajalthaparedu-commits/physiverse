@@ -156,7 +156,7 @@ background:rgba(0,0,0,0.2);
 z-index:5;
 pointer-events:none;
 }
-  
+
 </style>
 
 </head>
@@ -182,8 +182,13 @@ pointer-events:none;
 
 <div class="grid">
 
-<div class="world" onclick="loadWorld('electrostatics')">Electrostatics</div>
-<div class="world" onclick="loadWorld('modernPhysics')">Modern Physics</div>
+<div class="world" onclick="openWorldPage('electrostatics')">
+⚡ Electrostatics
+</div>
+
+<div class="world" onclick="openWorldPage('modernPhysics')">
+⚛ Modern Physics
+</div>
 
 </div>
 
@@ -198,6 +203,8 @@ Created by <span style="color:#7ecbff">Kajal Thapar</span>
 </div>
 
 <script>
+
+/* TITLE FLOW */
 const titleScreen = document.getElementById("titleScreen")
 const header = document.getElementById("header")
 const worldHub = document.getElementById("worldHub")
@@ -218,9 +225,14 @@ worldHub.style.opacity = 1
 }, 800)
 
 }
+
+/* WORLD NAVIGATION */
+function openWorldPage(world){
+  window.location.href = `./worlds/${world}.html`
+}
+
 </script>
 
-<!-- IMPORTANT: only ONE loadWorld (in main.js) -->
 <script type="module" src="./src/main.js"></script>
 
 </body>
