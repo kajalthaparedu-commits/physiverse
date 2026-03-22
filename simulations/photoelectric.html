@@ -523,40 +523,43 @@ function buildApp(){
 
   svg.appendChild(defs);
 
-  // ── QUARTZ WINDOW (subtly tilted rectangle, ~12° — parallel edges, minimal skew) ──
-  // Bottom edge aligns exactly with tube top (G.TY1). Skew = 8px only.
-  const qW=68, qH=54, qSkew=8;
+// ── QUARTZ WINDOW (clean + realistic) ──
+const qW = 70;
+const qH = 55;
+const qSkew = 14;
 
-  // Anchor relative to tube, NOT cathode
-  const qbL=G.TX1 + 20;   // safely inside tube edge
-  const qbR=qbL+qW;
+const qbL = G.TX1 + 20;
+const qbR = qbL + qW;
 
-  const qtL=qbL+qSkew;
-  const qtR=qbR+qSkew;
+const qtL = qbL + qSkew;
+const qtR = qbR + qSkew;
 
-  const qtY=G.TY1-qH;
-  const qbY=G.TY1;
-  // Fill (no border)
-  svg.appendChild(mkEl('polygon',{
+const qtY = G.TY1 - qH;
+const qbY = G.TY1;
+
+// Main glass body (this already includes border)
+svg.appendChild(mkEl('polygon',{
   points:`${qtL},${qtY} ${qtR},${qtY} ${qbR},${qbY} ${qbL},${qbY}`,
-  fill:'rgba(200,230,255,0.55)',
-  stroke:'none'
-  }));
+  fill:'rgba(180,220,255,0.35)',
+  stroke:'#6f8fa3',
+  'stroke-width':'1.2'
+}));
 
-  // Draw ONLY 3 sides (top + two slants)
-  svg.appendChild(mkEl('polyline',{
-  points:`${qtL},${qtY} ${qtR},${qtY} ${qbR},${qbY}`,
+// Inner highlight (glass shine)
+svg.appendChild(mkEl('polyline',{
+  points:`${qtL+6},${qtY+6} ${qtR-10},${qtY+6}`,
   fill:'none',
-  stroke:'#888',
-  'stroke-width':'1.5'
-  }));
+  stroke:'rgba(255,255,255,0.7)',
+  'stroke-width':'1'
+}));
 
-  svg.appendChild(mkEl('polyline',{
+// Edge highlight (subtle light reflection)
+svg.appendChild(mkEl('polyline',{
   points:`${qtL},${qtY} ${qbL},${qbY}`,
   fill:'none',
-  stroke:'#888',
-  'stroke-width':'1.5'
-  }));
+  stroke:'rgba(255,255,255,0.4)',
+  'stroke-width':'1'
+}));
 
   // Light beam arrow (from window to cathode)
   svg.appendChild(mkEl('g',{id:'beam'}));
@@ -717,16 +720,20 @@ if(qwg){
   const sigma=40;
   const k=0.25+(750-S.lam)/800;
   const omega=2*Math.PI*v*k;
+  const steps = 120;
+const packetSpacing = 60;
+const numPackets = 6;
 
-  const s0 = (_animT * v) - 60;
+for(let p = 0; p < numPackets; p++){
 
-  const pts=[];
-  const steps=120;
+  const sCenter = (_animT * v) - p * packetSpacing;
+
+  const pts = [];
 
   for(let i=0;i<=steps;i++){
     const s = (i/steps)*L;
 
-    const envelope = Math.exp(-((s - s0)**2)/(2*sigma*sigma));
+    const envelope = Math.exp(-((s - sCenter)**2)/(2*sigma*sigma));
     if(envelope < 0.002) continue;
 
     const carrier = Math.sin(2*Math.PI*k*s - omega*_animT);
@@ -744,7 +751,7 @@ if(qwg){
       fill:'none',
       stroke:specCol(S.lam),
       'stroke-width':String(2 + S.density*1.5),
-      opacity:'0.9'
+      opacity:'0.85'
     }));
   }
 }
