@@ -497,10 +497,8 @@ const graphView={
 function buildApp(){
   const svg = document.getElementById('apparatus');
   svg.innerHTML = '';
-
   const defs = mkEl('defs',{});
   svg.appendChild(defs);
-
   svg.appendChild(mkEl('g',{id:'qwg'}));
 
   // End cap gradient (shiny metal look)
@@ -520,8 +518,6 @@ function buildApp(){
   clip.appendChild(mkEl('rect',{x:String(G.CX2+1),y:String(G.TY1+8),
     width:String(G.AX1-G.CX2-2),height:String(G.TY2-G.TY1-16)}));
   defs.appendChild(clip);
-
-  svg.appendChild(defs);
 
 // ── QUARTZ WINDOW (clean + realistic) ──
 const qW = 70;
@@ -717,16 +713,17 @@ if(qwg){
 
   // REAL SPACE PARAMETERS
   const v=120;
-  const sigma=40;
+  const sigma=18;
   const k=0.25+(750-S.lam)/800;
   const omega=2*Math.PI*v*k;
-  const steps = 120;
-const packetSpacing = 60;
-const numPackets = 6;
+  const steps = 80;
+  const packetSpacing = 90;
+  const numPackets = 4;
 
-for(let p = 0; p < numPackets; p++){
+  for(let p = 0; p < numPackets; p++){
 
-  const sCenter = (_animT * v) - p * packetSpacing;
+  const cycle = packetSpacing * numPackets;
+  const sCenter = ((_animT * v - p * packetSpacing) % cycle + cycle) % cycle;
 
   const pts = [];
 
@@ -734,11 +731,9 @@ for(let p = 0; p < numPackets; p++){
     const s = (i/steps)*L;
 
     const envelope = Math.exp(-((s - sCenter)**2)/(2*sigma*sigma));
-    if(envelope < 0.002) continue;
+    if(envelope < 0.01) continue;
 
-    const carrier = Math.sin(2*Math.PI*k*s - omega*_animT);
-    const disp = envelope * carrier * 6;
-
+    const disp = envelope * 8;
     const bx = x0 + ux*s;
     const by = y0 + uy*s;
 
@@ -750,8 +745,8 @@ for(let p = 0; p < numPackets; p++){
       points:pts.join(' '),
       fill:'none',
       stroke:specCol(S.lam),
-      'stroke-width':String(2 + S.density*1.5),
-      opacity:'0.85'
+      'stroke-width': String(1.5 + envelope * 2.5),
+      opacity: String(0.6 + envelope * 0.4)
     }));
   }
 }
