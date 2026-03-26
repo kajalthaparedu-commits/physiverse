@@ -225,6 +225,7 @@ body.dark #gs{background:#0e1e2c}
   <button class="abs" id="dbtn" onclick="toggleData()">Show Data</button>
   <button class="abs" id="gbtn" onclick="toggleGraph()">Show Graphs</button>
   <button class="abs" id="swbtn" onclick="autoSweep()">⚡ Auto Sweep</button>
+  <button class="abs" onclick="exportCSV()">⬇ Export CSV</button>
   <button class="abs" onclick="clearData()">Clear Data</button>
   <button class="abs" onclick="resetAll()">Reset</button>
 </div>
@@ -291,7 +292,7 @@ body.dark #gs{background:#0e1e2c}
   <h3>I–V Curve</h3>
   <ul>
     <li><b>V ≥ 0:</b> saturation current I₀ (flat)</li>
-    <li><b>−Vs ≤ V &lt; 0:</b> quadratic falloff</li>
+    <li><b>−Vs ≤ V &lt; 0:</b> curve matching electron velocity distribution</li>
     <li><b>V &lt; −Vs:</b> current = 0</li>
   </ul>
   <h3>Controls</h3>
@@ -340,6 +341,9 @@ body.dark #gs{background:#0e1e2c}
     <li><b>x-intercept</b> = threshold frequency f₀</li>
     <li><b>y-intercept</b> = −φ (negative of work function)</li>
   </ul>
+  <p style="margin-top:8px; padding:8px; background:#fff3cd; border-left:3px solid #ffcc00; font-size:12px; color:#665500;">
+    <b>Pedagogical Note:</b> Negative KE values shown on the extrapolated graph line are theoretical. In physical reality, electrons cannot have negative kinetic energy; emission simply does not occur below the threshold frequency.
+  </p>
 
   <br><button onclick="closeRes()" style="padding:7px 18px;background:#0055aa;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Close</button>
 </div></div>
@@ -367,11 +371,12 @@ function lamToF(nm){ return C_LT/(nm*1e-9)/1e12; }
 function fToLam(f) { return C_LT/(f*1e12)*1e9; }
 
 function photoCurrent(V, I0, Vs){
-  if(I0<=0||Vs<0) return 0;
+  if(I0<=0) return 0;
   if(V>=0)    return I0;
   if(V<=-Vs)  return 0;
   const r=(V+Vs)/Vs;
-  return I0*r*r;
+  // Physically accurate emission distribution curve
+  return I0 * Math.pow(r, 1.5); 
 }
 
 function physics(lam,density,V,metal){
@@ -385,7 +390,8 @@ function physics(lam,density,V,metal){
   if(emitting){
     KE=Eph-phi;
     Vs=KE;
-    const I0=density*12;
+    const excess = Math.max(0, Eph - phi);
+    const I0 = density * 12 * (excess / Eph);
     current=photoCurrent(V,I0,Vs);
   }
   return{emitting,Eph,KE,Vs,current,fTHz,f0,lam0,phi};
@@ -445,8 +451,7 @@ function drawSpec(){
   sCtx.fillStyle='rgba(220,220,255,0.85)'; sCtx.fillText('UV',4,16);
   sCtx.textAlign='right'; sCtx.fillStyle='rgba(200,100,100,0.9)'; sCtx.fillText('IR',sW-4,16);
 
-  // Tick marks
-  [380,450,500,550,600,650,700].forEach(nm=>{
+  // Tick marks[380,450,500,550,600,650,700].forEach(nm=>{
     const x=(nm-LAM_LO)/(LAM_HI-LAM_LO)*sW;
     sCtx.strokeStyle='rgba(255,255,255,0.4)';sCtx.lineWidth=1;
     sCtx.beginPath();sCtx.moveTo(x,0);sCtx.lineTo(x,7);sCtx.stroke();
@@ -486,30 +491,28 @@ const G={
 function mkEl(tag,a){ const e=document.createElementNS(NS,tag); Object.entries(a).forEach(([k,v])=>e.setAttribute(k,v)); return e; }
 
 let _animT=0;
-let eParticles=[];           // discrete electron particles
+let eParticles=[];
+let wavePackets=[];
+// Per-graph viewport (x0,x1,y0,y1) — supports pan + zoom-to-cursor
 const graphView={
   kef:{x0:400,x1:820,y0:-3,y1:5},
-  iv:{x0:-3,x1:3,y0:0,y1:12},
-  vsf:{x0:400,x1:820,y0:0,y1:5},
-  ci:{x0:0,x1:1,y0:0,y1:12}
-}; // per-graph zoom level
+  iv: {x0:-3, x1:3,  y0:0,  y1:12},
+  vsf:{x0:400,x1:820,y0:0,  y1:5},
+  ci: {x0:0,  x1:1,  y0:0,  y1:12}
+};
 
 function buildApp(){
-  const svg = document.getElementById('apparatus');
-  svg.innerHTML = '';
-  const defs = mkEl('defs',{});
-  svg.appendChild(defs);
-  svg.appendChild(mkEl('g',{id:'qwg'}));
+  const svg=document.getElementById('apparatus'); svg.innerHTML='';
+
+  const defs=mkEl('defs',{});
 
   // End cap gradient (shiny metal look)
-  const ecG=mkEl('linearGradient',{id:'ecG',x1:'0%',y1:'0%',x2:'100%',y2:'0%'});
-  [{o:'0%',c:'#7a7a7a'},{o:'25%',c:'#cecece'},{o:'55%',c:'#eeeeee'},{o:'80%',c:'#b0b0b0'},{o:'100%',c:'#777777'}]
+  const ecG=mkEl('linearGradient',{id:'ecG',x1:'0%',y1:'0%',x2:'100%',y2:'0%'});[{o:'0%',c:'#7a7a7a'},{o:'25%',c:'#cecece'},{o:'55%',c:'#eeeeee'},{o:'80%',c:'#b0b0b0'},{o:'100%',c:'#777777'}]
     .forEach(s=>{const st=mkEl('stop',{offset:s.o});st.style.stopColor=s.c;ecG.appendChild(st);});
   defs.appendChild(ecG);
 
   // Tube body gradient (slight top shine)
-  const tG=mkEl('linearGradient',{id:'tG',x1:'0%',y1:'0%',x2:'0%',y2:'100%'});
-  [{o:'0%',c:'#f5f5f5'},{o:'18%',c:'#ffffff'},{o:'82%',c:'#f0f0f0'},{o:'100%',c:'#e0e0e0'}]
+  const tG=mkEl('linearGradient',{id:'tG',x1:'0%',y1:'0%',x2:'0%',y2:'100%'});[{o:'0%',c:'#f5f5f5'},{o:'18%',c:'#ffffff'},{o:'82%',c:'#f0f0f0'},{o:'100%',c:'#e0e0e0'}]
     .forEach(s=>{const st=mkEl('stop',{offset:s.o});st.style.stopColor=s.c;tG.appendChild(st);});
   defs.appendChild(tG);
 
@@ -519,43 +522,22 @@ function buildApp(){
     width:String(G.AX1-G.CX2-2),height:String(G.TY2-G.TY1-16)}));
   defs.appendChild(clip);
 
-// ── QUARTZ WINDOW (clean + realistic) ──
-const qW = 70;
-const qH = 55;
-const qSkew = 14;
+  svg.appendChild(defs);
 
-const qbL = G.TX1 + 20;
-const qbR = qbL + qW;
-
-const qtL = qbL + qSkew;
-const qtR = qbR + qSkew;
-
-const qtY = G.TY1 - qH;
-const qbY = G.TY1;
-
-// Main glass body (this already includes border)
-svg.appendChild(mkEl('polygon',{
-  points:`${qtL},${qtY} ${qtR},${qtY} ${qbR},${qbY} ${qbL},${qbY}`,
-  fill:'rgba(180,220,255,0.35)',
-  stroke:'#6f8fa3',
-  'stroke-width':'1.2'
-}));
-
-// Inner highlight (glass shine)
-svg.appendChild(mkEl('polyline',{
-  points:`${qtL+6},${qtY+6} ${qtR-10},${qtY+6}`,
-  fill:'none',
-  stroke:'rgba(255,255,255,0.7)',
-  'stroke-width':'1'
-}));
-
-// Edge highlight (subtle light reflection)
-svg.appendChild(mkEl('polyline',{
-  points:`${qtL},${qtY} ${qbL},${qbY}`,
-  fill:'none',
-  stroke:'rgba(255,255,255,0.4)',
-  'stroke-width':'1'
-}));
+  // ── QUARTZ WINDOW (subtly tilted rectangle, ~12° — parallel edges, minimal skew) ──
+  // Bottom edge aligns exactly with tube top (G.TY1). Skew = 8px only.
+  const qW=68, qH=54, qSkew=8;
+  const qbL=G.CX1-4, qbR=qbL+qW;        // bottom edge (at tube top)
+  const qtL=qbL+qSkew, qtR=qbR+qSkew;    // top edge (shifted right by skew)
+  const qtY=G.TY1-qH, qbY=G.TY1;
+  svg.appendChild(mkEl('polygon',{
+    points:`${qtL},${qtY} ${qtR},${qtY} ${qbR},${qbY} ${qbL},${qbY}`,
+    fill:'rgba(200,230,255,0.55)',stroke:'#888','stroke-width':'1.5'
+  }));
+  const qLbl=mkEl('text',{x:String((qtL+qtR)/2+2),y:String(qtY-3),'font-size':'8',
+    fill:'#666','font-family':'Arial','text-anchor':'middle'});
+  qLbl.textContent='Quartz Window'; svg.appendChild(qLbl);
+  svg.appendChild(mkEl('g',{id:'qwg'}));
 
   // Light beam arrow (from window to cathode)
   svg.appendChild(mkEl('g',{id:'beam'}));
@@ -686,70 +668,91 @@ function updateApp(){
     }
   }
 
-  // ── PHOTON WAVE PACKET: travels from quartz window top → cathode face ──
-  // ── TRUE GAUSSIAN WAVE PACKET (NON-PERIODIC, REAL SPACE) ──
-const qwg=svg.querySelector('#qwg'); 
-if(qwg) qwg.innerHTML='';
+  // ── DISCRETE WAVE PACKETS (PHOTONS) ──
+  const qwg = svg.querySelector('#qwg');
+  if (qwg) qwg.innerHTML = '';
 
-if(qwg){
+  const bm = svg.querySelector('#beam');
+  if (bm) bm.innerHTML = '';
 
-  // Path endpoints
-  const qbL2=G.TX1 + 20, qSkew2=8, qH2=54, qW2=68;
-  const qtL2=qbL2+qSkew2, qtR2=qtL2+qW2;
-  const qtY2=G.TY1-qH2;
-
-  const x0=(qtL2+qtR2)/2;
-  const y0=qtY2;
-
-  const x1=G.CX2;
-  const y1=G.TC;
-
-  // Direction vector
-  const dx=x1-x0, dy=y1-y0;
-  const L=Math.hypot(dx,dy);
-
-  const ux=dx/L, uy=dy/L;
-  const px=-uy, py=ux;
-
-  // REAL SPACE PARAMETERS
-  const v=120;
-  const sigma=18;
-  const k=0.25+(750-S.lam)/800;
-  const omega=2*Math.PI*v*k;
-  const steps = 80;
-  const packetSpacing = 90;
-  const numPackets = 4;
-
-  for(let p = 0; p < numPackets; p++){
-
-  const cycle = packetSpacing * numPackets;
-  const sCenter = ((_animT * v - p * packetSpacing) % cycle + cycle) % cycle;
-
-  const pts = [];
-
-  for(let i=0;i<=steps;i++){
-    const s = (i/steps)*L;
-
-    const envelope = Math.exp(-((s - sCenter)**2)/(2*sigma*sigma));
-    if(envelope < 0.01) continue;
-
-    const disp = envelope * 8;
-    const bx = x0 + ux*s;
-    const by = y0 + uy*s;
-
-    pts.push(`${(bx+px*disp).toFixed(1)},${(by+py*disp).toFixed(1)}`);
+  // Emit packets
+  const emissionRate = S.density * 0.08;
+  if (Math.random() < emissionRate) {
+    wavePackets.push({
+      t0: _animT,
+      speed: 0.22
+    });
   }
 
-  if(pts.length > 2){
-    qwg.appendChild(mkEl('polyline',{
-      points:pts.join(' '),
-      fill:'none',
-      stroke:specCol(S.lam),
-      'stroke-width': String(1.5 + envelope * 2.5),
-      opacity: String(0.6 + envelope * 0.4)
-    }));
-  }
-}
+  // Path
+  const startX = (G.CX1 - 4 + 8 + (68 / 2));
+  const startY = G.TY1 - 54;
+  const endX = G.CX2;
+  const endY = G.TC;
+
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const len = Math.hypot(dx, dy) || 1;
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+
+  // wavelength → frequency
+  const lambdaScaled = (S.lam - 200) / (750 - 200);
+  const cycles = 2 + (1 - lambdaScaled) * 18;
+  const k = cycles * 2 * Math.PI;
+
+  const sigma = 0.035;
+  const amplitude = 3.5;
+  const steps = 60;
+
+  // Draw packets
+  wavePackets = wavePackets.filter(p => {
+    const age = _animT - p.t0;
+    const center = age * p.speed;
+
+    if (center > 1.2) return false;
+
+    const pts =[];
+
+    for (let i = 0; i <= steps; i++) {
+      const s = i / steps;
+
+      const dist = s - center;
+      if (Math.abs(dist) > 0.12) continue;
+
+      const envelope = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+      const wave = Math.sin(k * (s - center));
+
+      const disp = amplitude * envelope * wave;
+
+      const bx = startX + ux * len * s;
+      const by = startY + uy * len * s;
+
+      pts.push(`${bx + px * disp},${by + py * disp}`);
+    }
+
+    if (pts.length > 2) {
+      qwg.appendChild(mkEl('polyline', {
+        points: pts.join(' '),
+        fill: 'none',
+        stroke: specCol(S.lam),
+        'stroke-width': 6,
+        opacity: 0.12
+      }));
+
+      qwg.appendChild(mkEl('polyline', {
+        points: pts.join(' '),
+        fill: 'none',
+        stroke: specCol(S.lam),
+        'stroke-width': 2
+      }));
+    }
+
+    return true;
+  });
 
   // ── FIELD LINES ──
   const fl=svg.querySelector('#flines'); if(fl) fl.innerHTML='';
@@ -785,15 +788,16 @@ if(qwg){
       });
     }
   } else {
-    eParticles=[];
+    eParticles =[];
   }
 
   // Update physics: electric field accelerates/decelerates
+  // We no longer kill negative velocities, allowing electrons to slow, stop, and reverse!
   const eFieldAcc=(S.V/5)*0.07;
   eParticles=eParticles.filter(e=>{
     e.vx+=eFieldAcc;
     e.x+=e.vx;
-    return e.vx>0.05&&e.x<G.AX1-2&&e.x>=G.CX2;
+    return e.x<G.AX1-2 && e.x>=G.CX2; 
   });
   while(eParticles.length>28) eParticles.shift();
 
@@ -802,16 +806,17 @@ if(qwg){
   if(eg){
     eg.innerHTML='';
     eParticles.forEach(e=>{
-      // Short trail showing direction
+      // Short trail showing direction (handles negative velocity properly now)
+      const dir = Math.sign(e.vx) || 1;
       eg.appendChild(mkEl('line',{
-        x1:String(Math.max(G.CX2,e.x-12).toFixed(1)),y1:String(e.y.toFixed(1)),
+        x1:String(Math.max(G.CX2,e.x-(12*dir)).toFixed(1)),y1:String(e.y.toFixed(1)),
         x2:String(e.x.toFixed(1)),y2:String(e.y.toFixed(1)),
         stroke:'#4477ee','stroke-width':'1.2',opacity:'0.3'
       }));
       // Electron dot
       eg.appendChild(mkEl('circle',{
         cx:String(e.x.toFixed(1)),cy:String(e.y.toFixed(1)),
-        r:'4.5',fill: KE > 2 ? '#ff4444' : '#3366dd',stroke:'#1133aa','stroke-width':'0.8'
+        r:'4.5',fill:'#3366dd',stroke:'#1133aa','stroke-width':'0.8'
       }));
     });
   }
@@ -925,16 +930,33 @@ function drawKEF(id,H){
   const{ctx,W}=r; const H2=r.H;
   const ml=48,mr=14,mt=18,mb=30;
 
-  // ── AUTO-SCALE: always include -φ (negative y-intercept) and threshold f0 ──
   const phi=S.phys.phi, f0base=S.phys.f0;
-  const kefPts=S.rows.filter(row=>row.KE>0);
+  
+  const kefPts = S.rows.map(row => ({
+    fTHz: row.fTHz,
+    KE: row.KE_raw
+  }));
 
-  let {x0,x1,y0:yLo,y1:yHi} = graphView.kef;
-
-
-  // Apply zoom centred on axis midpoints
-  // Use persistent viewport directly (no artificial scaling)
-  ({x0,x1,y0:yLo,y1:yHi} = graphView.kef);
+  // On first data, auto-expand viewport to fit; user can then pan/zoom freely
+  const v=graphView.kef;
+  if(kefPts.length>=2){
+    const fArr=kefPts.map(p=>p.fTHz);
+    const keArr=kefPts.map(p=>p.KE);
+    const fSpan=(Math.max(...fArr)-Math.min(...fArr))||100;
+    const autoX0=Math.min(v.x0,Math.min(...fArr)-fSpan*0.15);
+    const autoX1=Math.max(v.x1,Math.max(...fArr)+fSpan*0.15);
+    const autoY0=Math.min(v.y0,-phi*1.35);
+    const autoY1=Math.max(v.y1,Math.max(...keArr)+0.4);
+    if(autoX0<v.x0) v.x0=autoX0;
+    if(autoX1>v.x1) v.x1=autoX1;
+    if(autoY0<v.y0) v.y0=autoY0;
+    if(autoY1>v.y1) v.y1=autoY1;
+  }
+  
+  const x0 = v.x0;
+  const x1 = v.x1;
+  const yLo = Math.min(v.y0, -S.phys.phi * 1.5);
+  const yHi = v.y1;
 
   const xTk=niceTicks(x0,x1,6);
   const yTk=niceTicks(yLo,yHi,6);
@@ -962,8 +984,6 @@ function drawKEF(id,H){
 
   // Theoretical line — KE = H_EV_T*f − φ, across full visible domain
   ctx.strokeStyle=g.v0; ctx.lineWidth=1.2; ctx.setLineDash([6,4]); ctx.beginPath();
-  // Use already-defined f0base and phi
-  // Line: KE = H_EV_T*(f - f0), extended from 400 to 820 THz
   let tFirst=true;
   for(let f=x0;f<=x1;f+=4){
     const ke=H_EV_T*f-phi;
@@ -972,7 +992,11 @@ function drawKEF(id,H){
   }
   ctx.stroke(); ctx.setLineDash([]);
 
-  const pts=S.rows.filter(r=>r.KE>0).map(r=>({x:r.fTHz,y:r.KE}));
+  // USE RAW KE TO SHOW NEGATIVE VALUES TOO
+  const pts = S.rows.map(r => ({
+    x: r.fTHz,
+    y: r.KE_raw
+  }));
 
   if(pts.length>=2){
     const fit=linFit(pts);
@@ -1020,8 +1044,7 @@ function drawKEF(id,H){
       }
 
       // y-intercept (−φ): TRUE negative value, below the KE=0 line
-      // Only visible because Y range now includes negatives
-      const yInt=fit.b; // negative: e.g. −2.28 for sodium
+      const yInt=fit.b; 
       if(yInt>=yLo&&yInt<0){
         const icY=toY(yInt);
         // Dashed horizontal from y-axis rightward
@@ -1043,7 +1066,6 @@ function drawKEF(id,H){
       if(gs){
         gs.style.display='block';
         gs.innerHTML=`<b>KE vs Frequency — Fit Results:</b><br>
-          KE = (${fit.m.toFixed(3)}) f ${fit.b >= 0 ? '+' : ''} ${fit.b.toFixed(3)}
           slope = ${fit.m.toFixed(5)} eV/THz &nbsp;→&nbsp; h = ${h_ev.toExponential(3)} eV·s = ${h_si.toExponential(3)} J·s<br>
           Actual h = 6.626×10⁻³⁴ J·s &nbsp;|&nbsp; Error = ${(Math.abs(h_si-H_SI)/H_SI*100).toFixed(1)}%<br>
           f₀ (x-int) = ${fit.m?(-fit.b/fit.m).toFixed(0):'—'} THz &nbsp;|&nbsp; −φ (y-int) = ${fit.b.toFixed(3)} eV &nbsp;|&nbsp; R² = ${fit.r2.toFixed(4)}`;
@@ -1051,12 +1073,39 @@ function drawKEF(id,H){
     }
   }
 
-  // Data points (scatter)
-  ctx.fillStyle=g.sc;
-  pts.forEach(p=>{ctx.beginPath();ctx.arc(toX(p.x),toY(p.y),4,0,Math.PI*2);ctx.fill();});
+  // ── DATA SCATTER: colored by metal, with legend ──
+  const metalGroups={};
+  S.rows.forEach(row=>{
+    if(!metalGroups[row.metal]) metalGroups[row.metal]=[];
+    metalGroups[row.metal].push({x:row.fTHz,y:row.KE_raw});
+  });
+  Object.entries(metalGroups).forEach(([m,mpts])=>{
+    ctx.fillStyle=METALS[m].col;
+    mpts.forEach(p=>{
+      if(p.x>=x0&&p.x<=x1&&p.y>=yLo&&p.y<=yHi){
+        ctx.beginPath();ctx.arc(toX(p.x),toY(p.y),4.5,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=0.8;ctx.stroke();
+      }
+    });
+  });
+  // Legend (top-right corner)
+  const lgKeys=Object.keys(metalGroups);
+  if(lgKeys.length>1){
+    let ly=mt+6;
+    lgKeys.forEach(m=>{
+      const lx=ml+cw-58;
+      ctx.fillStyle=METALS[m].col;
+      ctx.fillRect(lx,ly,10,10);
+      ctx.strokeStyle='rgba(0,0,0,0.2)';ctx.lineWidth=0.5;ctx.strokeRect(lx,ly,10,10);
+      ctx.fillStyle=g.tx; ctx.font='8px Courier New'; ctx.textAlign='left';
+      ctx.fillText(METALS[m].sym+' φ='+METALS[m].phi,lx+13,ly+8);
+      ly+=13;
+    });
+  }
+
   if(!pts.length){
     ctx.fillStyle=g.tx; ctx.font='11px Arial'; ctx.textAlign='center';
-    ctx.fillText('Press Record or Auto Sweep to add data',ml+cw/2,toY(1));
+    ctx.fillText('Press Record or Auto Sweep to add data',ml+cw/2,toY(1)||mt+ch/2);
   }
 }
 
@@ -1064,10 +1113,13 @@ function drawVsF(id,H){
   const r=prep(id,H); if(!r)return;
   const{ctx,W}=r; const H2=r.H;
   const ml=44,mr=14,mt=18,mb=30;
-  const{cw,ch,toX,toY}=base(ctx,W,H2,ml,mr,mt,mb,400,820,0,5,'Frequency (THz)','Stopping Vs (V)',[400,500,600,700,800],[0,1,2,3,4,5]);
+  const v=graphView.vsf;
+  const xTk=niceTicks(v.x0,v.x1,6), yTk=niceTicks(v.y0,v.y1,6);
+  const{cw,ch,toX,toY}=base(ctx,W,H2,ml,mr,mt,mb,v.x0,v.x1,v.y0,v.y1,
+    'Frequency (THz)','Stopping Vs (V)',xTk,yTk);
   const g=gCol();
   const f0=S.phys.f0;
-  if(f0>=400&&f0<=820){
+  if(f0>=v.x0&&f0<=v.x1){
     ctx.strokeStyle=g.rv; ctx.lineWidth=1.2; ctx.setLineDash([4,2]);
     ctx.beginPath();ctx.moveTo(toX(f0),mt);ctx.lineTo(toX(f0),mt+ch);ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle=g.rv; ctx.font='8px Courier New'; ctx.textAlign='center';
@@ -1080,16 +1132,34 @@ function drawVsF(id,H){
       const xs=pts.map(p=>p.x);
       ctx.strokeStyle=g.ft; ctx.lineWidth=2; ctx.setLineDash([5,3]);
       ctx.beginPath();
-      ctx.moveTo(toX(Math.min(...xs)),toY(fit.m*Math.min(...xs)+fit.b));
-      ctx.lineTo(toX(Math.max(...xs)),toY(fit.m*Math.max(...xs)+fit.b));
+      let ff=true;
+      for(let f=v.x0;f<=v.x1;f+=4){
+        const vs=fit.m*f+fit.b;
+        if(vs<v.y0-0.2||vs>v.y1+0.2){ff=true;continue;}
+        const cy=toY(Math.max(v.y0,Math.min(v.y1,vs)));
+        ff?(ctx.moveTo(toX(f),cy),ff=false):ctx.lineTo(toX(f),cy);
+      }
       ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle=g.ft; ctx.font='8px Courier New'; ctx.textAlign='left';
-      ctx.fillText('slope = h/e = '+(fit.m).toFixed(4)+' V/THz',ml+4,mt+18);
+      ctx.fillText('slope = h/e = '+fit.m.toFixed(4)+' V/THz',ml+4,mt+18);
       ctx.fillText('R² = '+fit.r2.toFixed(4),ml+4,mt+28);
+      // x-intercept (f₀ from fit) — strong green dot
+      if(fit.m!==0){
+        const xi=-fit.b/fit.m;
+        if(xi>=v.x0&&xi<=v.x1){
+          ctx.fillStyle='#00aa00';
+          ctx.beginPath();ctx.arc(toX(xi),toY(0),5,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle=g.tx; ctx.font='8px Courier New'; ctx.textAlign='center';
+          ctx.fillText('f₀='+xi.toFixed(0),toX(xi),toY(0)+12);
+        }
+      }
     }
   }
   ctx.fillStyle=g.sc;
-  pts.forEach(p=>{ctx.beginPath();ctx.arc(toX(p.x),toY(p.y),4,0,Math.PI*2);ctx.fill();});
+  pts.forEach(p=>{
+    if(p.x>=v.x0&&p.x<=v.x1&&p.y>=v.y0&&p.y<=v.y1)
+      {ctx.beginPath();ctx.arc(toX(p.x),toY(p.y),4,0,Math.PI*2);ctx.fill();}
+  });
   if(!pts.length){ctx.fillStyle=g.tx;ctx.font='11px Arial';ctx.textAlign='center';
     ctx.fillText('Record data above threshold',ml+cw/2,mt+ch/2);}
 }
@@ -1143,7 +1213,7 @@ function closeModal(){ document.getElementById('modal').classList.remove('open')
 function updateUI(){
   const{emitting,Eph,KE,Vs,current,fTHz,f0,lam0,phi}=S.phys;
   const em=document.getElementById('ro-em');
-  if(em){em.textContent=emitting?'● EMITTING':'○ NO EMISSION (f < f₀)';em.className='ro-val '+(emitting?'emit-y':'emit-n');}
+  if(em){em.textContent=emitting?'● EMITTING':'○ NO EMISSION';em.className='ro-val '+(emitting?'emit-y':'emit-n');}
   const sv=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
   sv('ro-eph',Eph.toFixed(3)+' eV');
   sv('ro-phi',phi.toFixed(2)+' eV');
@@ -1167,7 +1237,18 @@ function updateUI(){
 // ══════════════════════════════════════════
 function recordPoint(){
   const{emitting,Eph,KE,Vs,current,fTHz}=S.phys;
-  S.rows.push({id:S.id++,metal:S.metal,lam:S.lam,fTHz,density:S.density,V:S.V,I:current,KE,Vs});
+  S.rows.push({
+    id:S.id++,
+    metal:S.metal,
+    lam:S.lam,
+    fTHz,
+    density:S.density,
+    V:S.V,
+    I:current,
+    KE_raw: (H_EV_T * fTHz - S.phys.phi),
+    KE,
+    Vs
+  });
   rebuildTable();
   if(!S.showGraph&&S.rows.filter(r=>r.KE>0).length>=3){
     S.showGraph=true;
@@ -1198,6 +1279,24 @@ function clearData(){
   if(S.showGraph)drawAll();
 }
 
+function exportCSV() {
+  if (!S.rows.length) {
+    alert("No data to export. Please record some points first.");
+    return;
+  }
+  let csv = "Point,Metal,Wavelength (nm),Frequency (THz),Photon Density,Voltage (V),Current (uA),KE_max (eV),Stopping_Vs (V)\n";
+  [...S.rows].reverse().forEach(r => {
+    csv += `${r.id},${r.metal},${r.lam},${r.fTHz.toFixed(4)},${r.density.toFixed(2)},${r.V.toFixed(3)},${r.I.toFixed(3)},${r.KE.toFixed(3)},${r.Vs.toFixed(3)}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Photoelectric_Data_PhysiForge.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function toggleData(){
   S.showData=!S.showData;
   document.getElementById('data-sec').style.display=S.showData?'block':'none';
@@ -1214,12 +1313,14 @@ function toggleGraph(){
 function resetAll(){
   S.lam=493;S.density=0.5;S.V=0;S.metal='sodium';
   recalc();syncCtrl();buildMetals();buildApp();
+  // Reset graph viewports
   Object.assign(graphView,{
-  kef:{x0:400,x1:820,y0:-3,y1:5},
-  iv:{x0:-3,x1:3,y0:0,y1:12},
-  vsf:{x0:400,x1:820,y0:0,y1:5},
-  ci:{x0:0,x1:1,y0:0,y1:12}
-});
+    kef:{x0:400,x1:820,y0:-3,y1:5},
+    iv: {x0:-3, x1:3,  y0:0,  y1:12},
+    vsf:{x0:400,x1:820,y0:0,  y1:5},
+    ci: {x0:0,  x1:1,  y0:0,  y1:12}
+  });
+  if(S.showGraph) drawAll();
 }
 
 // ══════════════════════════════════════════
@@ -1339,41 +1440,48 @@ function wire(){
     clearTimeout(rt);rt=setTimeout(()=>{initSpec();if(S.showGraph)drawAll();},150);
   });
 
-  // ── GRAPH ZOOM: mouse wheel on any canvas ──
-  [{id:'kef-c',k:'kef'},{id:'iv-c',k:'iv'},{id:'vsf-c',k:'vsf'},{id:'ci-c',k:'ci'}].forEach(({id,k})=>{
+  // ── GRAPH INTERACTION: cursor-centred zoom + drag-to-pan ──
+  let panState=null;[{id:'kef-c',k:'kef'},{id:'iv-c',k:'iv'},{id:'vsf-c',k:'vsf'},{id:'ci-c',k:'ci'}].forEach(({id,k})=>{
     const c=document.getElementById(id); if(!c) return;
-   c.addEventListener('wheel',e=>{
-  e.preventDefault();
+    c.title='Scroll to zoom · Drag to pan';
 
-  const rect=c.getBoundingClientRect();
-  const mx=e.clientX-rect.left;
-  const my=e.clientY-rect.top;
+    // Cursor-centred wheel zoom
+    c.addEventListener('wheel',e=>{
+      e.preventDefault();
+      const rect=c.getBoundingClientRect();
+      const zx=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+      const zy=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+      const scale=Math.exp(e.deltaY*-0.0015);
+      const v=graphView[k];
+      const rx=v.x1-v.x0, ry=v.y1-v.y0;
+      const nx0=v.x0+rx*zx*(1-scale);
+      const nx1=v.x1-rx*(1-zx)*(1-scale);
+      const ny0=v.y0+ry*(1-zy)*(1-scale);
+      const ny1=v.y1-ry*zy*(1-scale);
+      if(Math.abs(nx1-nx0)>0.01&&Math.abs(ny1-ny0)>0.01){
+        v.x0=nx0;v.x1=nx1;v.y0=ny0;v.y1=ny1;
+      }
+      drawAll();
+    },{passive:false});
 
-  const view=graphView[k];
-
-  const zx = Math.max(0, Math.min(1, mx / rect.width));
-  const zy = Math.max(0, Math.min(1, my / rect.height));
-
-  const scale = Math.exp(e.deltaY * -0.0015); // smooth exponential zoom
-
-  const nx0 = view.x0 + (view.x1 - view.x0)*zx*(1 - scale);
-  const nx1 = view.x1 - (view.x1 - view.x0)*(1 - zx)*(1 - scale);
-
-  const ny0 = view.y0 + (view.y1 - view.y0)*(1 - zy)*(1 - scale);
-  const ny1 = view.y1 - (view.y1 - view.y0)*zy*(1 - scale);
-
-  // Clamp limits (prevents collapse)
-  if(Math.abs(nx1-nx0) > 0.01 && Math.abs(ny1-ny0) > 0.01){
-    view.x0 = nx0;
-    view.x1 = nx1;
-    view.y0 = ny0;
-    view.y1 = ny1;
-  }
-
-  drawAll();
-
-},{passive:false});
-    c.title='Scroll to zoom';
+    // Drag-to-pan
+    c.addEventListener('mousedown',e=>{
+      panState={k,cx:e.clientX,cy:e.clientY,view:{...graphView[k]}};
+    });
+    c.addEventListener('mousemove',e=>{
+      if(!panState||panState.k!==k) return;
+      const rect=c.getBoundingClientRect();
+      const dx=(e.clientX-panState.cx)/rect.width;
+      const dy=(e.clientY-panState.cy)/rect.height;
+      const pv=panState.view;
+      const rx=pv.x1-pv.x0, ry=pv.y1-pv.y0;
+      graphView[k].x0=pv.x0-dx*rx;
+      graphView[k].x1=pv.x1-dx*rx;
+      graphView[k].y0=pv.y0+dy*ry;
+      graphView[k].y1=pv.y1+dy*ry;
+      drawAll();
+    });
+    window.addEventListener('mouseup',()=>{ panState=null; });
   });
 }
 
